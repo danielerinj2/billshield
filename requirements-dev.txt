@@ -1,0 +1,13 @@
+# Development & testing dependencies for BillShield
+# Install with: pip install -r requirements-dev.txt
+# Includes production deps + dev tools
+
+-r requirements.txt
+
+# Test fixture generation
+reportlab>=4.0.0
+
+# Future additions (uncomment when needed):
+# pytest>=7.0.0
+# ragas>=0.1.0
+# ruff>=0.1.0

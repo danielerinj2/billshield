@@ -1,0 +1,307 @@
+{
+  "entries": [
+    {
+      "drug_name": "Paracetamol",
+      "synonyms": ["Acetaminophen", "PCM"],
+      "dosage_form_strength": "Tablet 500 mg",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 1.61,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Paracetamol",
+      "synonyms": ["Acetaminophen", "PCM"],
+      "dosage_form_strength": "Tablet 650 mg",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 2.09,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Paracetamol",
+      "synonyms": ["Acetaminophen", "PCM"],
+      "dosage_form_strength": "Oral suspension 250 mg/5 mL",
+      "unit": "1 mL",
+      "ceiling_price_inr": 0.79,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Paracetamol",
+      "synonyms": ["Acetaminophen", "PCM"],
+      "dosage_form_strength": "IV Infusion 10 mg/mL",
+      "unit": "1 mL",
+      "ceiling_price_inr": 1.18,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Metformin Hydrochloride",
+      "synonyms": ["Metformin"],
+      "dosage_form_strength": "Tablet 500 mg",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 1.41,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Metformin Hydrochloride",
+      "synonyms": ["Metformin"],
+      "dosage_form_strength": "Tablet 850 mg",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 1.86,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Metformin Hydrochloride",
+      "synonyms": ["Metformin"],
+      "dosage_form_strength": "Tablet 1000 mg (Extended Release)",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 2.49,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Tramadol Hydrochloride",
+      "synonyms": ["Tramadol"],
+      "dosage_form_strength": "Capsule 50 mg",
+      "unit": "1 Capsule",
+      "ceiling_price_inr": 4.92,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Tramadol Hydrochloride",
+      "synonyms": ["Tramadol"],
+      "dosage_form_strength": "Injection 50 mg/mL",
+      "unit": "1 mL",
+      "ceiling_price_inr": 8.65,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Ondansetron",
+      "synonyms": [],
+      "dosage_form_strength": "Tablet 4 mg",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 3.51,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Ondansetron",
+      "synonyms": [],
+      "dosage_form_strength": "Tablet 8 mg",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 5.62,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Ondansetron",
+      "synonyms": [],
+      "dosage_form_strength": "Injection 2 mg/mL",
+      "unit": "1 mL",
+      "ceiling_price_inr": 5.81,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Pantoprazole",
+      "synonyms": [],
+      "dosage_form_strength": "Tablet 20 mg (Enteric coated)",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 4.83,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Pantoprazole",
+      "synonyms": [],
+      "dosage_form_strength": "Tablet 40 mg (Enteric coated)",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 7.21,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Pantoprazole",
+      "synonyms": [],
+      "dosage_form_strength": "Powder for Injection 40 mg",
+      "unit": "1 Vial",
+      "ceiling_price_inr": 26.18,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Metronidazole",
+      "synonyms": [],
+      "dosage_form_strength": "Tablet 400 mg",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 1.27,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Metronidazole",
+      "synonyms": [],
+      "dosage_form_strength": "IV Infusion 5 mg/mL",
+      "unit": "1 mL",
+      "ceiling_price_inr": 0.25,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Diclofenac Sodium",
+      "synonyms": ["Diclofenac"],
+      "dosage_form_strength": "Tablet 50 mg",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 1.55,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Diclofenac Sodium",
+      "synonyms": ["Diclofenac"],
+      "dosage_form_strength": "Injection 25 mg/mL",
+      "unit": "1 mL",
+      "ceiling_price_inr": 2.78,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Enoxaparin Sodium",
+      "synonyms": ["Enoxaparin", "Clexane (brand)", "Lovenox (brand)"],
+      "dosage_form_strength": "Injection 40 mg/0.4 mL",
+      "unit": "1 Pre-filled syringe",
+      "ceiling_price_inr": 351.96,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Enoxaparin Sodium",
+      "synonyms": ["Enoxaparin"],
+      "dosage_form_strength": "Injection 60 mg/0.6 mL",
+      "unit": "1 Pre-filled syringe",
+      "ceiling_price_inr": 528.71,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Ranitidine Hydrochloride",
+      "synonyms": ["Ranitidine"],
+      "dosage_form_strength": "Tablet 150 mg",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 2.14,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Furosemide",
+      "synonyms": ["Frusemide", "Lasix (brand)"],
+      "dosage_form_strength": "Tablet 40 mg",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 0.91,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Furosemide",
+      "synonyms": ["Frusemide"],
+      "dosage_form_strength": "Injection 10 mg/mL",
+      "unit": "1 mL",
+      "ceiling_price_inr": 1.66,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Salbutamol",
+      "synonyms": ["Albuterol"],
+      "dosage_form_strength": "Tablet 4 mg",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 0.79,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Salbutamol",
+      "synonyms": ["Albuterol"],
+      "dosage_form_strength": "Respirator solution 5 mg/mL (Nebuliser)",
+      "unit": "1 mL",
+      "ceiling_price_inr": 3.78,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Insulin (Human, Soluble/Regular)",
+      "synonyms": ["Regular Insulin", "Actrapid (brand)"],
+      "dosage_form_strength": "Injection 40 IU/mL (10 mL vial)",
+      "unit": "1 Vial",
+      "ceiling_price_inr": 175.62,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Insulin (Isophane / NPH)",
+      "synonyms": ["NPH Insulin"],
+      "dosage_form_strength": "Injection 40 IU/mL (10 mL vial)",
+      "unit": "1 Vial",
+      "ceiling_price_inr": 178.34,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Ceftriaxone",
+      "synonyms": [],
+      "dosage_form_strength": "Powder for Injection 1 g",
+      "unit": "1 Vial",
+      "ceiling_price_inr": 36.92,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Cefuroxime",
+      "synonyms": [],
+      "dosage_form_strength": "Tablet 250 mg",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 23.85,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Cefuroxime",
+      "synonyms": [],
+      "dosage_form_strength": "Powder for Injection 750 mg",
+      "unit": "1 Vial",
+      "ceiling_price_inr": 78.34,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Ciprofloxacin",
+      "synonyms": [],
+      "dosage_form_strength": "Tablet 500 mg",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 8.71,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Cetirizine Hydrochloride",
+      "synonyms": ["Cetirizine"],
+      "dosage_form_strength": "Tablet 10 mg",
+      "unit": "1 Tablet",
+      "ceiling_price_inr": 1.65,
+      "source_notification": "S.O. 1489(E) 27.03.2025"
+    },
+    {
+      "drug_name": "Normal Saline (0.9% Sodium Chloride)",
+      "synonyms": ["NS", "0.9% NaCl", "Saline"],
+      "dosage_form_strength": "IV Infusion 500 mL bottle",
+      "unit": "1 Bottle (500 mL)",
+      "ceiling_price_inr": 38.50,
+      "source_notification": "NPPA non-scheduled monitored — typical ceiling"
+    },
+    {
+      "drug_name": "Ringer Lactate",
+      "synonyms": ["RL", "Hartmann's solution"],
+      "dosage_form_strength": "IV Infusion 500 mL bottle",
+      "unit": "1 Bottle (500 mL)",
+      "ceiling_price_inr": 42.75,
+      "source_notification": "NPPA non-scheduled monitored — typical ceiling"
+    },
+    {
+      "drug_name": "Dextrose Normal Saline (DNS)",
+      "synonyms": ["DNS", "Dextrose Saline"],
+      "dosage_form_strength": "IV Infusion 500 mL bottle (5% Dextrose + 0.9% NaCl)",
+      "unit": "1 Bottle (500 mL)",
+      "ceiling_price_inr": 45.20,
+      "source_notification": "NPPA non-scheduled monitored — typical ceiling"
+    },
+    {
+      "drug_name": "Dextrose 5%",
+      "synonyms": ["D5W", "5% Dextrose"],
+      "dosage_form_strength": "IV Infusion 500 mL bottle",
+      "unit": "1 Bottle (500 mL)",
+      "ceiling_price_inr": 36.80,
+      "source_notification": "NPPA non-scheduled monitored — typical ceiling"
+    }
+  ],
+  "metadata": {
+    "purpose": "Commonly-billed generic drugs and IV fluids that are not in the parsed section (pages 1-37) of the NPPA Updated Price List 2025.",
+    "compilation_date": "2026-05",
+    "regulatory_basis": "DPCO 2013 Schedule-I ceiling prices for scheduled drugs; Para 20 monitored prices for IV fluids and non-scheduled items.",
+    "important_note": "IV fluids prices are typical ceilings under NPPA's Para 20 monitoring (10% YoY increase cap); they vary slightly by manufacturer. The hospital should be able to justify any IV fluid charge that exceeds these typical ceilings.",
+    "synonym_handling": "Each entry includes alternate names. The agent's lookup tool should normalize drug names against this synonyms list before matching."
+  }
+}

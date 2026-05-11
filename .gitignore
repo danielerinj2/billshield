@@ -1,0 +1,22 @@
+# Secrets — never commit these
+.env
+*.key
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Large data files — don't bloat the repo
+data/raw/*.pdf
+data/uploaded/
+data/vector_db/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

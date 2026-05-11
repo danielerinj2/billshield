@@ -1,0 +1,55 @@
+{
+  "source_document": "F.No.5-16/CGHS(HQ)/HEC/2024(PartI), Office Memorandum dated 03.10.2025",
+  "effective_from": "2025-10-13",
+  "city_tier_adjustments": {
+    "explanation": "Rates are first set for Tier I (X) cities; Tier II/III rates are derived as percentage reductions from Tier I.",
+    "tier_1_X": {"adjustment": 0.00, "examples": ["Delhi", "Mumbai", "Chennai", "Kolkata", "Bengaluru", "Hyderabad", "Pune", "Ahmedabad"]},
+    "tier_2_Y": {"adjustment": -0.10, "note": "10% lower than Tier I rates. Also applies to North-East states, J&K, Ladakh.", "examples": ["Lucknow", "Patna", "Jaipur", "Kochi", "Coimbatore"]},
+    "tier_3_Z": {"adjustment": -0.20, "note": "20% lower than Tier I rates.", "examples": ["Most other Indian cities and towns"]},
+    "applies_to": "Package rates / procedure rates only. Does NOT apply to consultations, lab investigations, day-care procedures, or minor procedures."
+  },
+  "accreditation_adjustments": {
+    "explanation": "The CGHS rate sheet provides three columns per procedure: Non-NABH, NABH, Super Speciality. Pick the column matching the hospital's accreditation status.",
+    "non_nabh": {"adjustment_vs_nabh": -0.15, "note": "Non-accredited hospitals get 15% lower than NABH rates."},
+    "nabh": {"adjustment_vs_nabh": 0.00, "note": "NABH-accredited hospitals: base rate."},
+    "super_speciality": {"adjustment_vs_nabh": 0.15, "note": "Super-speciality hospitals get 15% higher than NABH rates. Speciality must be one of: Cardiology, CTVS, Neurology, Neurosurgery, Oncology, Urology/Nephrology, Gastroenterology, Endocrinology, Plastic Surgery, Pulmonology, Rheumatology, Hand & Microsurgery."}
+  },
+  "ward_adjustments": {
+    "explanation": "The CGHS package rate is the semi-private ward rate. Adjust for actual ward used.",
+    "general_ward": {"adjustment": -0.05, "note": "General ward = 5% less than semi-private rate."},
+    "semi_private": {"adjustment": 0.00, "note": "Base rate as in CGHS table."},
+    "private_ward": {"adjustment": 0.05, "note": "Private ward = 5% more than semi-private rate."},
+    "applies_to": "Inpatient procedures and surgeries only. Does NOT apply to consultations, day-care, or lab investigations (these are ward-uniform per CGHS rule)."
+  },
+  "multi_procedure_rule": {
+    "explanation": "Critical anomaly check. Hospitals routinely violate this rule.",
+    "rule": "When multiple surgeries are performed in the same OT session on the same date:",
+    "primary_surgery_rate_percent": 100,
+    "second_surgery_in_same_session_rate_percent": 50,
+    "third_and_beyond_rate_percent": 25,
+    "applies_when": "Surgeries are performed on same date, same operating theatre session, same anaesthesia event.",
+    "does_not_apply_when": "Surgeries are on different dates or unrelated sessions even if same admission.",
+    "violation_pattern": "Bill shows 2+ surgical procedures each at 100% of package rate."
+  },
+  "room_rent_daily_caps": {
+    "explanation": "Maximum daily room rent. Hospital cannot charge above these regardless of accreditation, in CGHS empanelled mode.",
+    "general_ward": {"inr_per_day": 1500},
+    "semi_private": {"inr_per_day": 3000},
+    "private": {"inr_per_day": 4500},
+    "icu_iccu_nicu": {"inr_per_day": 5400},
+    "notes": "These caps include nursing charges, basic monitoring, and standard ward services. Separate consumables/medication charges are over and above."
+  },
+  "uniform_rate_categories": {
+    "explanation": "These categories have the same rate regardless of ward, city tier, or accreditation:",
+    "consultations": "Same rate for all wards within same accreditation/tier.",
+    "lab_investigations": "Same rate across wards.",
+    "radiotherapy": "Uniform across wards.",
+    "day_care_procedures": "Uniform across wards.",
+    "minor_procedures_not_requiring_admission": "Uniform across wards.",
+    "tier_2_3_adjustments_for_these": "Still apply (-10% for Tier II, -20% for Tier III). Only ward/accreditation adjustments are waived."
+  },
+  "cancer_treatment_exception": {
+    "rule": "Cancer surgeries are excluded from this rate revision; existing CGHS rules apply to cancer surgeries.",
+    "applies_revised_rates_to": ["Chemotherapy", "Radiotherapy", "Cancer-related investigations"]
+  }
+}

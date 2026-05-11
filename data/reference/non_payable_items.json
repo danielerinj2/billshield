@@ -1,0 +1,1226 @@
+{
+  "items": [
+    {
+      "sl_no": 1,
+      "item_name": "ANNE FRENCH CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 2,
+      "item_name": "BABY CHARGES (UNLESS SPECIFIED/INDICATED)",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 3,
+      "item_name": "BABY FOOD",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 4,
+      "item_name": "BABY UTILITES CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 5,
+      "item_name": "BABY SET",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 6,
+      "item_name": "BABY BOTTLES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 7,
+      "item_name": "BOTTLE",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 8,
+      "item_name": "BRUSH",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 9,
+      "item_name": "COSY TOWEL",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 10,
+      "item_name": "HAND WASH",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 11,
+      "item_name": "MOISTURISER PASTE BRUSH",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 12,
+      "item_name": "POWDER",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 13,
+      "item_name": "RAZOR",
+      "status_text_raw": "Payable",
+      "status": "payable"
+    },
+    {
+      "sl_no": 14,
+      "item_name": "TOWEL",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 15,
+      "item_name": "SHOE COVER",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 16,
+      "item_name": "BEAUTY SERVICES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 17,
+      "item_name": "BELTS/ BRACES",
+      "status_text_raw": "Essential and should be paid at least specifically for cases who have undergone surgery of thoracic or lumbar spine.",
+      "status": "conditionally_payable"
+    },
+    {
+      "sl_no": 18,
+      "item_name": "BUDS",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 19,
+      "item_name": "BARBER CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 20,
+      "item_name": "CAPS",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 21,
+      "item_name": "COLD PACK/HOT PACK",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 22,
+      "item_name": "CARRY BAGS",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 23,
+      "item_name": "CRADLE CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 24,
+      "item_name": "COMB",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 25,
+      "item_name": "DISPOSABLES RAZORS CHARGES ( for site",
+      "status_text_raw": "Payable preparations)",
+      "status": "payable"
+    },
+    {
+      "sl_no": 26,
+      "item_name": "EAU-DE-COLOGNE / ROOM FRESHNERS",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 27,
+      "item_name": "EYE PAD",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 28,
+      "item_name": "EYE SHEILD",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 29,
+      "item_name": "EMAIL / INTERNET CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 30,
+      "item_name": "FOOD CHARGES (OTHER THAN PATIENT's DIET",
+      "status_text_raw": "Not Payable PROVIDED BY HOSPITAL)",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 31,
+      "item_name": "FOOT COVER",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 32,
+      "item_name": "GOWN",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 33,
+      "item_name": "LEGGINGS",
+      "status_text_raw": "Essential in bariatric and varicose vein surgery and may be considered for at least these conditions where surgery itself is payable.",
+      "status": "conditionally_payable"
+    },
+    {
+      "sl_no": 34,
+      "item_name": "LAUNDRY CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 35,
+      "item_name": "MINERAL WATER",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 36,
+      "item_name": "OIL CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 37,
+      "item_name": "SANITARY PAD",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 38,
+      "item_name": "SLIPPERS",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 39,
+      "item_name": "TELEPHONE CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 40,
+      "item_name": "TISSUE PAPER",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 41,
+      "item_name": "TOOTH PASTE",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 42,
+      "item_name": "TOOTH BRUSH",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 43,
+      "item_name": "GUEST SERVICES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 44,
+      "item_name": "BED PAN",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 45,
+      "item_name": "BED UNDER PAD CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 46,
+      "item_name": "CAMERA COVER",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 47,
+      "item_name": "CARE FREE",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 48,
+      "item_name": "CLINIPLAST",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 49,
+      "item_name": "CREPE BANDAGE",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 50,
+      "item_name": "CURAPORE",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 51,
+      "item_name": "DIAPER OF ANY TYPE",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 52,
+      "item_name": "DVD, CD CHARGES",
+      "status_text_raw": "Not Payable ( However if CD is specifically sought by Insurer/TPA then payable)",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 53,
+      "item_name": "EYELET COLLAR",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 54,
+      "item_name": "FACE MASK",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 55,
+      "item_name": "FLEXI MASK",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 56,
+      "item_name": "GAUSE SOFT",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 57,
+      "item_name": "GAUZE",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 58,
+      "item_name": "HAND HOLDER",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 59,
+      "item_name": "HANSAPLAST/ ADHESIVE BANDAGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 60,
+      "item_name": "LACTOGEN/ INFANT FOOD",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 61,
+      "item_name": "SLINGS Reasonable costs for one sling in case of upper arm fractures may be considered ITEMS SPECIFICALLY EXCLUDED IN THE POLICIES ITEMS SPECIFICALLY EXCLUDED IN THE POLICIES",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 62,
+      "item_name": "WEIGHT CONTROL PROGRAMS/ SUPPLIES/ Exclusion in policy unless otherwise specified SERVICES",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 63,
+      "item_name": "COST OF SPECTACLES/ CONTACT LENSES/",
+      "status_text_raw": "Not Payable HEARING AIDS ETC.,",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 64,
+      "item_name": "DENTAL TREATMENT EXPENSES THAT DO NOT",
+      "status_text_raw": "Not Payable REQUIRE HOSPITALISATION",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 65,
+      "item_name": "HORMONE REPLACEMENT THERAPY Exclusion in policy unless otherwise specified",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 66,
+      "item_name": "HOME VISIT CHARGES Exclusion in policy unless otherwise specified",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 67,
+      "item_name": "INFERTILITY/ SUBFERTILITY/ ASSISTED Exclusion in policy unless otherwise specified CONCEPTION PROCEDURE",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 68,
+      "item_name": "OBESITY (INCLUDING MORBID OBESITY) Exclusion in policy unless otherwise specified TREATMENT",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 69,
+      "item_name": "PSYCHIATRIC & PSYCHOSOMATIC DISORDERS Exclusion in policy unless otherwise specified",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 70,
+      "item_name": "CORRECTIVE SURGERY FOR REFRACTIVE ERROR Exclusion in policy unless otherwise specified",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 71,
+      "item_name": "TREATMENT OF SEXUALLY TRANSMITTED Exclusion in policy unless otherwise specified DISEASES",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 72,
+      "item_name": "DONOR SCREENING CHARGES Exclusion in policy unless otherwise specified",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 73,
+      "item_name": "ADMISSION/REGISTRATION CHARGES Exclusion in policy unless otherwise specified",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 74,
+      "item_name": "HOSPITALISATION FOR EVALUATION/ Exclusion in policy unless otherwise specified DIAGNOSTIC PURPOSE",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 75,
+      "item_name": "EXPENSES FOR INVESTIGATION/ TREATMENT",
+      "status_text_raw": "Not Payable - Exclusion in policy unless otherwise IRRELEVANT TO THE DISEASE FOR WHICH specified ADMITTED OR DIAGNOSED",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 76,
+      "item_name": "ANY EXPENSES WHEN THE PATIENT IS",
+      "status_text_raw": "Not payable as per HIV/AIDS exclusion DIAGNOSED WITH RETRO VIRUS + OR SUFFERING FROM /HIV/ AIDS ETC IS DETECTED/ DIRECTLY OR INDIRECTLY",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 77,
+      "item_name": "STEM CELL IMPLANTATION/ SURGERY",
+      "status_text_raw": "Not Payable except Bone Marrow Transplantation ITEMS WHICH FORM PART OF HOSPITAL SERVICESw WheHrEeR cEo SvEePreAdR AbTy Ep CoOlicNySUMABLES ARE NOT PAYABLE BUT THE SERVICE IS",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 78,
+      "item_name": "WARD AND THEATRE BOOKING CHARGES",
+      "status_text_raw": "Payable under OT Charges, not payable separately",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 79,
+      "item_name": "ARTHROSCOPY & ENDOSCOPY INSTRUMENTS Rental charged by the hospital payable. Purchase of Instruments not payable.",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 80,
+      "item_name": "MICROSCOPE COVER",
+      "status_text_raw": "Payable under OT Charges, not separately",
+      "status": "payable"
+    },
+    {
+      "sl_no": 81,
+      "item_name": "SURGICAL BLADES,HARMONIC SCALPEL,SHAVER",
+      "status_text_raw": "Payable under OT Charges, not separately",
+      "status": "payable"
+    },
+    {
+      "sl_no": 82,
+      "item_name": "SURGICAL DRILL",
+      "status_text_raw": "Payable under OT Charges, not separately",
+      "status": "payable"
+    },
+    {
+      "sl_no": 83,
+      "item_name": "EYE KIT",
+      "status_text_raw": "Payable under OT Charges, not separately",
+      "status": "payable"
+    },
+    {
+      "sl_no": 84,
+      "item_name": "EYE DRAPE",
+      "status_text_raw": "Payable under OT Charges, not separately",
+      "status": "payable"
+    },
+    {
+      "sl_no": 85,
+      "item_name": "X-RAY FILM",
+      "status_text_raw": "Payable under Radiology Charges, not as consumable",
+      "status": "payable"
+    },
+    {
+      "sl_no": 86,
+      "item_name": "SPUTUM CUP",
+      "status_text_raw": "Payable under Investigation Charges, not as consumable",
+      "status": "payable"
+    },
+    {
+      "sl_no": 87,
+      "item_name": "BOYLES APPARATUS CHARGES Part of OT Charges, not seperately",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 88,
+      "item_name": "BLOOD GROUPING AND CROSS MATCHING OF Part of Cost of Blood, not payable DONORS SAMPLES",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 89,
+      "item_name": "SAVLON",
+      "status_text_raw": "Not Payable-Part of Dressing Charges",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 90,
+      "item_name": "BAND AIDS, BANDAGES, STERLILE INJECTIONS,",
+      "status_text_raw": "Not Payable - Part of Dressing charges NEEDLES, SYRINGES",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 91,
+      "item_name": "COTTON",
+      "status_text_raw": "Not Payable-Part of Dressing Charges",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 92,
+      "item_name": "COTTON BANDAGE",
+      "status_text_raw": "Not Payable- Part of Dressing Charges",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 93,
+      "item_name": "MICROPORE/ SURGICAL TAPE",
+      "status_text_raw": "Not Payable-Payable by the patient when prescribed, otherwise included as Dressing Charges",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 94,
+      "item_name": "BLADE",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 95,
+      "item_name": "APRON",
+      "status_text_raw": "Not Payable -Part of Hospital Services/ Disposable linen to be part of OT/ICU chatges",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 96,
+      "item_name": "TORNIQUET",
+      "status_text_raw": "Not Payable (service is charged by hospitals, consumables cannot be separately charged)",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 97,
+      "item_name": "ORTHOBUNDLE, GYNAEC BUNDLE Part of Dressing Charges",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 98,
+      "item_name": "URINE CONTAINER",
+      "status_text_raw": "Not Payable ELEMENTS OF ROOM CHARGE",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 99,
+      "item_name": "LUXURY TAX Actual tax levied by government is payable.Part of room charge for sub limits",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 100,
+      "item_name": "HVAC Part of room charge not payable separately",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 101,
+      "item_name": "HOUSE KEEPING CHARGES Part of room charge not payable separately",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 102,
+      "item_name": "SERVICE CHARGES WHERE NURSING CHARGE Part of room charge not payable separately ALSO CHARGED",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 103,
+      "item_name": "TELEVISION & AIR CONDITIONER CHARGES",
+      "status_text_raw": "Payable under room charges not if separately levied",
+      "status": "payable"
+    },
+    {
+      "sl_no": 104,
+      "item_name": "SURCHARGES Part of Room Charge,",
+      "status_text_raw": "Not payable separately",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 105,
+      "item_name": "ATTENDANT CHARGES",
+      "status_text_raw": "Not Payable - Part of Room Charges",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 106,
+      "item_name": "IM IV INJECTION CHARGES Part of nursing charges, not payable",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 107,
+      "item_name": "CLEAN SHEET Part of Laundry/Housekeeping not payable separately",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 108,
+      "item_name": "EXTRA DIET OF PATIENT(OTHER THAN THAT Patient Diet provided by hospital is payable WHICH FORMS PART OF BED CHARGE)",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 109,
+      "item_name": "BLANKET/WARMER BLANKET",
+      "status_text_raw": "Not Payable- part of room charges ADMINISTRATIVE OR NON-MEDICAL CHARGES",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 110,
+      "item_name": "ADMISSION KIT",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 111,
+      "item_name": "BIRTH CERTIFICATE",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 112,
+      "item_name": "BLOOD RESERVATION CHARGES AND ANTE NATAL",
+      "status_text_raw": "Not Payable BOOKING CHARGES",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 113,
+      "item_name": "CERTIFICATE CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 114,
+      "item_name": "COURIER CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 115,
+      "item_name": "CONVENYANCE CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 116,
+      "item_name": "DIABETIC CHART CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 117,
+      "item_name": "DOCUMENTATION CHARGES / ADMINISTRATIVE",
+      "status_text_raw": "Not Payable EXPENSES",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 118,
+      "item_name": "DISCHARGE PROCEDURE CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 119,
+      "item_name": "DAILY CHART CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 120,
+      "item_name": "ENTRANCE PASS / VISITORS PASS CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 121,
+      "item_name": "EXPENSES RELATED TO PRESCRIPTION ON To be claimed by patient under Post Hosp where DISCHARGE admissible",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 122,
+      "item_name": "FILE OPENING CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 123,
+      "item_name": "INCIDENTAL EXPENSES / MISC. CHARGES (NOT",
+      "status_text_raw": "Not Payable EXPLAINED)",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 124,
+      "item_name": "MEDICAL CERTIFICATE",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 125,
+      "item_name": "MAINTAINANCE CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 126,
+      "item_name": "MEDICAL RECORDS",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 127,
+      "item_name": "PREPARATION CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 128,
+      "item_name": "PHOTOCOPIES CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 129,
+      "item_name": "PATIENT IDENTIFICATION BAND / NAME TAG",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 130,
+      "item_name": "WASHING CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 131,
+      "item_name": "MEDICINE BOX",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 132,
+      "item_name": "MORTUARY CHARGES",
+      "status_text_raw": "Payable upto 24 hrs, shifting charges not payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 133,
+      "item_name": "MEDICO LEGAL CASE CHARGES (MLC CHARGES)",
+      "status_text_raw": "Not Payable EXTERNAL DURABLE DEVICES",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 134,
+      "item_name": "WALKING AIDS CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 135,
+      "item_name": "BIPAP MACHINE",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 136,
+      "item_name": "COMMODE",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 137,
+      "item_name": "CPAP/ CAPD EQUIPMENTS Device not payable",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 138,
+      "item_name": "INFUSION PUMP - COST Device not payable",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 139,
+      "item_name": "OXYGEN CYLINDER (FOR USAGE OUTSIDE THE",
+      "status_text_raw": "Not Payable HOSPITAL)",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 140,
+      "item_name": "PULSEOXYMETER CHARGES Device not payable",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 141,
+      "item_name": "SPACER",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 142,
+      "item_name": "SPIROMETRE Device not payable",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 143,
+      "item_name": "SPO2 PROBE",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 144,
+      "item_name": "NEBULIZER KIT",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 145,
+      "item_name": "STEAM INHALER",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 146,
+      "item_name": "ARMSLING",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 147,
+      "item_name": "THERMOMETER",
+      "status_text_raw": "Not Payable (paid by patient)",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 148,
+      "item_name": "CERVICAL COLLAR",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 149,
+      "item_name": "SPLINT",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 150,
+      "item_name": "DIABETIC FOOT WEAR",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 151,
+      "item_name": "KNEE BRACES ( LONG/ SHORT/ HINGED)",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 152,
+      "item_name": "KNEE IMMOBILIZER/SHOULDER IMMOBILIZER",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 153,
+      "item_name": "LUMBO SACRAL BELT",
+      "status_text_raw": "Essential and should be paid at least specifically for cases who have undergone surgery of lumbar spine.",
+      "status": "conditionally_payable"
+    },
+    {
+      "sl_no": 154,
+      "item_name": "NIMBUS BED OR WATER OR AIR BED CHARGES",
+      "status_text_raw": "Payable for any ICU patient requiring more than 3 days in ICU, all patients with paraplegia/quadriplegia for any reason and at reasonable cost of approximately Rs 200/ day",
+      "status": "payable"
+    },
+    {
+      "sl_no": 155,
+      "item_name": "AMBULANCE COLLAR",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 156,
+      "item_name": "AMBULANCE EQUIPMENT",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 157,
+      "item_name": "MICROSHEILD",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 158,
+      "item_name": "ABDOMINAL BINDER",
+      "status_text_raw": "Essential and should be paid at least in post surgery patients of major abdominal surgery including TAH, LSCS, incisional hernia repair, exploratory laparotomy for intestinal obstruction, liver transplant etc. ITEMS PAYABLE IF SUPPORTED BY A PRESCRIPTION",
+      "status": "conditionally_payable"
+    },
+    {
+      "sl_no": 159,
+      "item_name": "BETADINE \\ HYDROGEN May be payable when prescribed for patient, not PEROXIDE\\SPIRIT\\\\DETTOL \\SAVLON\\ payable for hospital use in OT or ward or for dressings DISINFECTANTS ETC in hospital",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 160,
+      "item_name": "PRIVATE NURSES CHARGES- SPECIAL NURSING Post hospitalization nursing charges not",
+      "status_text_raw": "Payable CHARGES",
+      "status": "payable"
+    },
+    {
+      "sl_no": 161,
+      "item_name": "NUTRITION PLANNING CHARGES - DIETICIAN Patient Diet provided by hospital is payable CHARGES / DIET CHARGES",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 162,
+      "item_name": "ALEX SUGAR FREE",
+      "status_text_raw": "Payable -Sugar free variants of admissable medicines are not excluded",
+      "status": "payable"
+    },
+    {
+      "sl_no": 163,
+      "item_name": "CREAMS POWDERS LOTIONS (Toileteries are not",
+      "status_text_raw": "Payable when prescribed payable,only prescribed medical pharmaceuticals payable)",
+      "status": "payable"
+    },
+    {
+      "sl_no": 164,
+      "item_name": "DIGENE GEL/ ANTACID GEL",
+      "status_text_raw": "Payable when prescribed",
+      "status": "payable"
+    },
+    {
+      "sl_no": 165,
+      "item_name": "ECG ELECTRODES Upto 5 electrodes are required for every case visiting OT or ICU. For longer stay in ICU, may require a change and at least one set every second day must be payable.",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 166,
+      "item_name": "GLOVES Sterilized Gloves payable / unsterilized gloves not payable",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 167,
+      "item_name": "HIV KIT",
+      "status_text_raw": "Payable - payable Pre operative screening",
+      "status": "payable"
+    },
+    {
+      "sl_no": 168,
+      "item_name": "LISTERINE/ ANTISEPTIC MOUTHWASH",
+      "status_text_raw": "Payable when prescribed",
+      "status": "payable"
+    },
+    {
+      "sl_no": 169,
+      "item_name": "LOZENGES",
+      "status_text_raw": "Payable when prescribed",
+      "status": "payable"
+    },
+    {
+      "sl_no": 170,
+      "item_name": "MOUTH PAINT",
+      "status_text_raw": "Payable when prescribed",
+      "status": "payable"
+    },
+    {
+      "sl_no": 171,
+      "item_name": "NEBULISATION KIT If used during hospitalization is payable reasonably",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 172,
+      "item_name": "NEOSPRIN",
+      "status_text_raw": "Payable when prescribed",
+      "status": "payable"
+    },
+    {
+      "sl_no": 173,
+      "item_name": "NOVARAPID",
+      "status_text_raw": "Payable when prescribed",
+      "status": "payable"
+    },
+    {
+      "sl_no": 174,
+      "item_name": "17 VOLINI GEL/ ANALGESIC GEL",
+      "status_text_raw": "Payable when prescribed",
+      "status": "payable"
+    },
+    {
+      "sl_no": 175,
+      "item_name": "ZYTEE GEL",
+      "status_text_raw": "Payable when prescribed",
+      "status": "payable"
+    },
+    {
+      "sl_no": 176,
+      "item_name": "VACCINATION CHARGES Routine Vaccination not",
+      "status_text_raw": "Payable / Post Bite Vaccination Payable PART OF HOSPITAL'S OWN COSTS AND NOT PAYABLE",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 177,
+      "item_name": "AHD",
+      "status_text_raw": "Not Payable - Part of Hospital's internal Cost",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 178,
+      "item_name": "ALCOHOL SWABES",
+      "status_text_raw": "Not Payable - Part of Hospital's internal Cost",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 179,
+      "item_name": "SCRUB SOLUTION/STERILLIUM",
+      "status_text_raw": "Not Payable - Part of Hospital's internal Cost OTHERS",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 180,
+      "item_name": "VACCINE CHARGES FOR BABY",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 181,
+      "item_name": "AESTHETIC TREATMENT / SURGERY",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 182,
+      "item_name": "TPA CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 183,
+      "item_name": "VISCO BELT CHARGES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 184,
+      "item_name": "ANY KIT WITH NO DETAILS MENTIONED",
+      "status_text_raw": "Not Payable [DELIVERY KIT, ORTHOKIT, RECOVERY KIT, ETC]",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 185,
+      "item_name": "EXAMINATION GLOVES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 186,
+      "item_name": "KIDNEY TRAY",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 187,
+      "item_name": "MASK",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 188,
+      "item_name": "OUNCE GLASS",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 189,
+      "item_name": "OUTSTATION CONSULTANT'S/ SURGEON'S FEES",
+      "status_text_raw": "Not payable, except for telemedicine consultations where covered by policy",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 190,
+      "item_name": "OXYGEN MASK",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 191,
+      "item_name": "PAPER GLOVES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 192,
+      "item_name": "PELVIC TRACTION BELT Should be payable in case of PIVD requiring traction as this is generally not reused",
+      "status_text_raw": "",
+      "status": "review_manually"
+    },
+    {
+      "sl_no": 193,
+      "item_name": "REFERAL DOCTOR'S FEES",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 194,
+      "item_name": "ACCU CHECK ( Glucometery/ Strips)",
+      "status_text_raw": "Not payable pre hospitilasation or post hospitalisation / Reports and Charts required/ Device not payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 195,
+      "item_name": "PAN CAN",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 196,
+      "item_name": "SOFNET",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 197,
+      "item_name": "TROLLY COVER",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 198,
+      "item_name": "UROMETER, URINE JUG",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 199,
+      "item_name": "AMBULANCE",
+      "status_text_raw": "Payable-Ambulance from home to hospital or interhospital shifts is payable/ RTA as specific requirement is payable",
+      "status": "payable"
+    },
+    {
+      "sl_no": 200,
+      "item_name": "TEGADERM / VASOFIX SAFETY",
+      "status_text_raw": "Payable - maximum of 3 in 48 hrs and then 1 in 24 hrs",
+      "status": "payable"
+    },
+    {
+      "sl_no": 201,
+      "item_name": "URINE BAG",
+      "status_text_raw": "Payable where medicaly necessary till a reasonable cost - maximum 1 per 24 hrs",
+      "status": "payable"
+    },
+    {
+      "sl_no": 202,
+      "item_name": "SOFTOVAC",
+      "status_text_raw": "Not Payable",
+      "status": "not_payable"
+    },
+    {
+      "sl_no": 203,
+      "item_name": "STOCKINGS",
+      "status_text_raw": "Essential for case like CABG etc. where it should be paid.",
+      "status": "conditionally_payable"
+    }
+  ],
+  "metadata": {
+    "source": "IRDAI Standard List of Non-Payable Items",
+    "regulatory_basis": "IRDAI Master Circular on Health Insurance Business 2024"
+  }
+}

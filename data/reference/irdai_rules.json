@@ -1,0 +1,122 @@
+{
+  "source_documents": [
+    "Master Circular on Protection of Policyholders' Interests, 2024 (IRDAI)",
+    "Master Circular on Health Insurance Business, 2024 (IRDAI)",
+    "Insurance Products Regulations 2024"
+  ],
+  "rules": [
+    {
+      "rule_id": "IRDAI_2024_CASHLESS_PREAUTH_1HR",
+      "category": "cashless_timeline",
+      "rule_summary": "Insurer must decide on cashless pre-authorisation request within 1 hour of receipt.",
+      "verbatim_quote": "Insurer shall decide on the request for cashless authorisation immediately but not more than one hour of receipt of request.",
+      "source": "Master Circular on Health Insurance Business 2024",
+      "effective_from": "2024-07-31",
+      "violation_consequence": "Insurer bears any additional cost arising from delay (e.g., extended hospital stay).",
+      "use_when": "Patient or hospital requests cashless treatment at network hospital and authorization is delayed."
+    },
+    {
+      "rule_id": "IRDAI_2024_DISCHARGE_AUTH_3HR",
+      "category": "cashless_timeline",
+      "rule_summary": "Insurer must grant final discharge authorisation within 3 hours of request.",
+      "verbatim_quote": "Insurer shall grant final authorisation within three hours of the receipt of discharge authorisation request from the hospital. In no case, the policyholder shall be made to wait to be discharged from the Hospital.",
+      "source": "Master Circular on Health Insurance Business 2024",
+      "effective_from": "2024-07-31",
+      "violation_consequence": "Insurer must bear additional charges incurred beyond the 3-hour window.",
+      "use_when": "Discharge process is delayed beyond 3 hours from the discharge authorisation request."
+    },
+    {
+      "rule_id": "IRDAI_2024_15DAY_SETTLEMENT",
+      "category": "claim_settlement",
+      "rule_summary": "Claims must be settled within 15 days of intimation. Delays incur interest at bank rate + 2%.",
+      "source": "Master Circular on Protection of Policyholders' Interests 2024",
+      "violation_consequence": "Insurer must pay interest (bank rate + 2%) on delayed amounts, suo-moto, without claimant having to request it.",
+      "use_when": "Insurer takes longer than 15 days from claim intimation to settle."
+    },
+    {
+      "rule_id": "IRDAI_2024_NO_AGE_LIMIT",
+      "category": "eligibility",
+      "rule_summary": "Insurers cannot set upper age limit for new health policies.",
+      "source": "IRDAI Insurance Products Regulations 2024",
+      "effective_from": "2024-04-01",
+      "use_when": "Insurer rejects a new policy application citing age above some threshold."
+    },
+    {
+      "rule_id": "IRDAI_2024_PED_3YR_WAITING",
+      "category": "waiting_period",
+      "rule_summary": "Maximum waiting period for pre-existing diseases reduced to 3 years (down from 4).",
+      "source": "IRDAI Health Insurance Regulations 2024",
+      "use_when": "Insurer denies a claim citing PED waiting period exceeding 3 years."
+    },
+    {
+      "rule_id": "IRDAI_2024_MORATORIUM_5YR",
+      "category": "claim_rejection",
+      "rule_summary": "After 5 years of continuous coverage, claims cannot be rejected for non-disclosure of pre-existing conditions, except in cases of proven fraud.",
+      "source": "Master Circular on Health Insurance Business 2024",
+      "use_when": "Insurer rejects a claim on a policy older than 5 years citing non-disclosure of pre-existing condition. Burden of proof is on the insurer to demonstrate fraud."
+    },
+    {
+      "rule_id": "IRDAI_2024_AYUSH_FULL_COVERAGE",
+      "category": "coverage_scope",
+      "rule_summary": "AYUSH treatments (Ayurveda, Yoga, Naturopathy, Unani, Siddha, Homeopathy) must be covered up to the full sum insured. Sub-limits are not permitted.",
+      "source": "IRDAI Health Insurance Regulations 2024",
+      "use_when": "Insurer applies a sub-limit on AYUSH treatments."
+    },
+    {
+      "rule_id": "IRDAI_2024_SPECIFIC_DISEASE_3YR_WAITING",
+      "category": "waiting_period",
+      "rule_summary": "Specific disease/procedure waiting period (e.g., joint replacement) reduced to 3 years (down from 4).",
+      "source": "IRDAI Health Insurance Regulations 2024",
+      "use_when": "Insurer denies a claim for a specified procedure citing a waiting period longer than 3 years."
+    },
+    {
+      "rule_id": "IRDAI_2024_RENEWAL_PROTECTION",
+      "category": "policy_renewal",
+      "rule_summary": "Insurer cannot deny renewal of a health policy except in cases of established fraud.",
+      "source": "IRDAI Health Insurance Regulations 2024",
+      "use_when": "Insurer refuses to renew a health policy citing claim history, age, or pre-existing conditions."
+    },
+    {
+      "rule_id": "IRDAI_2024_INCLUSIVITY_SEVERE_CONDITIONS",
+      "category": "eligibility",
+      "rule_summary": "Insurers cannot deny health insurance to people with severe pre-existing conditions (cancer, heart disease, AIDS, etc.).",
+      "source": "IRDAI Health Insurance Regulations 2024",
+      "use_when": "Insurer refuses to issue a policy citing serious pre-existing conditions."
+    },
+    {
+      "rule_id": "IRDAI_2024_MULTI_CLAIM_FLEXIBILITY",
+      "category": "claim_filing",
+      "rule_summary": "Policyholders with multiple insurance policies can file claims with different insurers (subject to total claim not exceeding actual expense).",
+      "source": "IRDAI Health Insurance Regulations 2024",
+      "use_when": "Insurer rejects claim citing existence of another policy."
+    },
+    {
+      "rule_id": "IRDAI_2024_GRIEVANCE_14DAY",
+      "category": "grievance_resolution",
+      "rule_summary": "Insurers must resolve complaints filed via Bima Bharosa within 14 days.",
+      "source": "Master Circular on Protection of Policyholders' Interests 2024",
+      "escalation_path": "If unresolved after 14 days, complaint can be escalated to the Insurance Ombudsman (online via cioins.co.in or physically at the regional ombudsman office).",
+      "use_when": "Insurer delays response to a Bima Bharosa complaint."
+    },
+    {
+      "rule_id": "IRDAI_2024_DEATH_DURING_TREATMENT",
+      "category": "claim_settlement",
+      "rule_summary": "If policyholder dies during treatment, insurer must immediately process the claim settlement and help release mortal remains from hospital.",
+      "source": "Master Circular on Health Insurance Business 2024",
+      "use_when": "Insurer delays settlement after policyholder's death, preventing release of body from hospital."
+    },
+    {
+      "rule_id": "IRDAI_2024_CASHLESS_NETWORK_REQUIREMENT",
+      "category": "cashless",
+      "rule_summary": "Insurers must maintain a network of hospitals supporting cashless claim payments. Insurer pays the hospital directly; policyholder is not made to pay out-of-pocket first.",
+      "source": "Master Circular on Health Insurance Business 2024",
+      "use_when": "Hospital refuses cashless treatment at an insurer's network hospital."
+    }
+  ],
+  "complaint_escalation_pathway": {
+    "step_1_insurer_grievance_cell": "File complaint with insurer's grievance officer. Insurer has 14 days to resolve.",
+    "step_2_bima_bharosa": "File via bimabharosa.irdai.gov.in. This is integrated with insurer complaint systems in real time.",
+    "step_3_insurance_ombudsman": "If unsatisfied after 14 days or insurer response, file with Insurance Ombudsman at cioins.co.in or local office. Each ombudsman covers specific states.",
+    "step_4_consumer_court": "For claims of deficiency of service, consumer forums under Consumer Protection Act 2019."
+  }
+}
