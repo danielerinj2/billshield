@@ -1,0 +1,207 @@
+"""
+RAG retrieval functions for BillShield agent.
+"""
+import chromadb
+from chromadb.utils import embedding_functions
+from typing import List, Dict
+
+class BillShieldRAG:
+    """RAG retrieval system for BillShield."""
+    
+    def __init__(self, chromadb_path: str = "data/chromadb"):
+        self.client = chromadb.PersistentClient(path=chromadb_path)
+        self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+        )
+        
+        # Load collections
+        self.irdai_collection = self.client.get_collection(
+            name="irdai_regulations",
+            embedding_function=self.embedding_fn
+        )
+        
+        self.reference_collection = self.client.get_collection(
+            name="reference_benchmarks",
+            embedding_function=self.embedding_fn
+        )
+    
+    def search_irdai_regulations(
+        self, 
+        query: str, 
+        n_results: int = 3,
+        min_similarity: float = 0.5
+    ) -> List[Dict]:
+        """
+        Search IRDAI regulations for relevant clauses.
+        
+        Args:
+            query: Natural language query (e.g., "claim settlement timeline")
+            n_results: Number of results to return
+            min_similarity: Minimum similarity threshold (0-1)
+        
+        Returns:
+            List of dicts with keys: text, page, section, reference, similarity
+        """
+        results = self.irdai_collection.query(
+            query_texts=[query],
+            n_results=n_results
+        )
+        
+        formatted_results = []
+        for doc, metadata, distance in zip(
+            results['documents'][0],
+            results['metadatas'][0],
+            results['distances'][0]
+        ):
+            similarity = 1 - distance
+            
+            if similarity >= min_similarity:
+                formatted_results.append({
+                    "text": doc,
+                    "page": metadata['page'],
+                    "section": metadata['section'],
+                    "reference": metadata['reference'],
+                    "document": metadata['document'],
+                    "date": metadata['date'],
+                    "similarity": round(similarity, 3)
+                })
+        
+        return formatted_results
+    
+    def search_cghs_rates(
+        self, 
+        procedure: str, 
+        n_results: int = 5
+    ) -> List[Dict]:
+        """
+        Search CGHS rate card for procedure pricing.
+        
+        Args:
+            procedure: Procedure name (e.g., "ICU per day", "CT scan")
+            n_results: Number of results to return
+        
+        Returns:
+            List of dicts with procedure details and rates
+        """
+        results = self.reference_collection.query(
+            query_texts=[procedure],
+            n_results=n_results,
+            where={"type": "cghs_rate"}
+        )
+        
+        formatted_results = []
+        for doc, metadata, distance in zip(
+            results['documents'][0],
+            results['metadatas'][0],
+            results['distances'][0]
+        ):
+            similarity = 1 - distance
+            
+            formatted_results.append({
+                "procedure": metadata.get('procedure', ''),
+                "rate": metadata.get('rate', 0),
+                "category": metadata.get('category', ''),
+                "similarity": round(similarity, 3),
+                "match_text": doc
+            })
+        
+        return formatted_results
+    
+    def search_non_payable_items(
+        self, 
+        item: str, 
+        n_results: int = 5
+    ) -> List[Dict]:
+        """
+        Search for non-payable items per IRDAI guidelines.
+        
+        Args:
+            item: Item description
+            n_results: Number of results to return
+        
+        Returns:
+            List of dicts with non-payable item details
+        """
+        results = self.reference_collection.query(
+            query_texts=[item],
+            n_results=n_results,
+            where={"type": "non_payable"}
+        )
+        
+        formatted_results = []
+        for doc, metadata, distance in zip(
+            results['documents'][0],
+            results['metadatas'][0],
+            results['distances'][0]
+        ):
+            similarity = 1 - distance
+            
+            formatted_results.append({
+                "item": metadata.get('item', ''),
+                "category": metadata.get('category', ''),
+                "similarity": round(similarity, 3),
+                "match_text": doc
+            })
+        
+        return formatted_results
+
+
+# Convenience functions for agent tools
+def lookup_irdai_regulation(query: str) -> str:
+    """
+    Agent tool: Look up IRDAI regulation by natural language query.
+    Returns formatted citation.
+    """
+    rag = BillShieldRAG()
+    results = rag.search_irdai_regulations(query, n_results=2)
+    
+    if not results:
+        return f"No IRDAI regulation found for: {query}"
+    
+    # Format as citation
+    citations = []
+    for i, result in enumerate(results, 1):
+        citations.append(
+            f"[{i}] {result['document']} (Ref: {result['reference']}, "
+            f"Page {result['page']}, Section: {result['section']})\n"
+            f"Excerpt: {result['text'][:300]}..."
+        )
+    
+    return "\n\n".join(citations)
+
+
+def lookup_cghs_rate(procedure: str) -> str:
+    """
+    Agent tool: Look up CGHS rate for a procedure.
+    Returns formatted rate info.
+    """
+    rag = BillShieldRAG()
+    results = rag.search_cghs_rates(procedure, n_results=3)
+    
+    if not results:
+        return f"No CGHS rate found for: {procedure}"
+    
+    # Format results
+    rate_info = [f"CGHS rates for '{procedure}':"]
+    for result in results:
+        if result['rate'] > 0:  # Filter out ₹0 entries
+            rate_info.append(
+                f"  - {result['procedure']}: ₹{result['rate']:,.2f} "
+                f"(Category: {result['category']})"
+            )
+    
+    if len(rate_info) == 1:
+        return f"No valid CGHS rates found for: {procedure}"
+    
+    return "\n".join(rate_info)
+
+
+if __name__ == "__main__":
+    # Quick test
+    print("Testing agent-facing functions:\n")
+    
+    print("1. IRDAI Regulation Lookup:")
+    print(lookup_irdai_regulation("15 day claim settlement rule"))
+    
+    print("\n\n2. CGHS Rate Lookup:")
+    print(lookup_cghs_rate("ICU charges"))
