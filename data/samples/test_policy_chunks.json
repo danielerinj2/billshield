@@ -1,0 +1,78 @@
+{
+  "policy_info": {
+    "name": "Test Health Policy",
+    "source_file": "data/samples/test_policy.pdf",
+    "total_pages": 2,
+    "total_chunks": 4
+  },
+  "chunks": [
+    {
+      "chunk_id": "policy_chunk_1",
+      "text": "HEALTH INSURANCE POLICY\nPolicy Number: HLTH/2025/123456\nCOVERAGE\nThis policy provides coverage for hospitalization expenses up to the Sum Insured of n5,00,000 per\npolicy year. Coverage includes room rent, ICU charges, surgery costs, medicines, and diagnostic\ntests.\nPre-hospitalization expenses are covered for 60 days before admission and post-hospitalization\nexpenses for 90 days after discharge.\nSUB-LIMITS\nRoom Rent: Maximum n5,000 per day for general ward. ICU charges capped at n10,000 per\nday.\nAmbulance: Maximum n2,000 per hospitalization.\nCataract Surgery: Maximum n40,000 per eye per policy year.\nEXCLUSIONS\nThe following are NOT covered under this policy:\nDental treatment unless requiring hospitalization exceeding 24 hours.",
+      "metadata": {
+        "source": "user_policy",
+        "policy_name": "Test Health Policy",
+        "page": 1,
+        "section": "HEALTH INSURANCE POLICY",
+        "sections_mentioned": [
+          "exclusions",
+          "coverage",
+          "sub-limits",
+          "sum insured",
+          "room rent",
+          "ambulance",
+          "pre-hospitalization",
+          "post-hospitalization"
+        ],
+        "monetary_limits": [],
+        "chunk_chars": 736
+      }
+    },
+    {
+      "chunk_id": "policy_chunk_2",
+      "text": "Cosmetic or plastic surgery except for medically necessary reconstructive surgery.\nTreatment for obesity, weight control, or bariatric surgery.\nExpenses incurred at non-network hospitals without prior cashless authorization\n(reimbursement may be limited to 80% of eligible amount).\nItems of personal comfort including but not limited to: telephone charges, attendant charges,\ntelevision, barber services, cosmetics, diapers.",
+      "metadata": {
+        "source": "user_policy",
+        "policy_name": "Test Health Policy",
+        "page": 1,
+        "section": "HEALTH INSURANCE POLICY",
+        "sections_mentioned": [],
+        "monetary_limits": [],
+        "chunk_chars": 424
+      }
+    },
+    {
+      "chunk_id": "policy_chunk_3",
+      "text": "4. WAITING PERIODS\nInitial Waiting Period: 30 days from policy inception for all claims except accident-related\nhospitalization.\nPre-existing Diseases: 48 months waiting period for conditions existing prior to policy\npurchase.\nSpecific Diseases: 24 months for cataract, hernia, hysterectomy, joint replacement surgery,\nbenign prostatic hypertrophy, and gallbladder stones.\nCO-PAYMENT\nFor policyholders aged 60 years and above, a co-payment of 20% applies to all claims. This means\nthe insured bears 20% of admissible claim amount, and the company pays 80%.\nCLAIM PROCEDURE\nCashless Claims: Contact our 24x7 helpline at 1800-XXX-XXXX at least 24 hours before\nplanned hospitalization. For emergency admissions, notify within 24 hours of admission.",
+      "metadata": {
+        "source": "user_policy",
+        "policy_name": "Test Health Policy",
+        "page": 2,
+        "section": "4. WAITING PERIODS",
+        "sections_mentioned": [
+          "co-payment",
+          "waiting period",
+          "pre-existing",
+          "claim procedure"
+        ],
+        "monetary_limits": [
+          "rs 20"
+        ],
+        "chunk_chars": 745
+      }
+    },
+    {
+      "chunk_id": "policy_chunk_4",
+      "text": "Reimbursement Claims: Submit claim form with original bills, discharge summary, diagnostic\nreports, and payment receipts within 15 days of discharge.\nAll claims are subject to medical review and verification of supporting documents.",
+      "metadata": {
+        "source": "user_policy",
+        "policy_name": "Test Health Policy",
+        "page": 2,
+        "section": "4. WAITING PERIODS",
+        "sections_mentioned": [],
+        "monetary_limits": [],
+        "chunk_chars": 232
+      }
+    }
+  ]
+}

@@ -145,6 +145,56 @@ class BillShieldRAG:
         
         return formatted_results
 
+    def search_policy(
+        self,
+        query: str,
+        n_results: int = 3,
+        collection_name: str = "user_policy"
+    ) -> List[Dict]:
+        """
+        Search user's insurance policy for relevant clauses.
+        
+        Args:
+            query: Natural language query (e.g., "room rent limit", "exclusions")
+            n_results: Number of results to return
+            collection_name: Policy collection name (default: "user_policy")
+        
+        Returns:
+            List of dicts with policy text, page, section, metadata
+        """
+        try:
+            policy_collection = self.client.get_collection(
+                name=collection_name,
+                embedding_function=self.embedding_fn
+            )
+        except:
+            return []  # No policy loaded
+        
+        results = policy_collection.query(
+            query_texts=[query],
+            n_results=n_results
+        )
+        
+        formatted_results = []
+        for doc, metadata, distance in zip(
+            results['documents'][0],
+            results['metadatas'][0],
+            results['distances'][0]
+        ):
+            similarity = 1 - distance
+            
+            formatted_results.append({
+                "text": doc,
+                "page": metadata['page'],
+                "section": metadata['section'],
+                "policy_name": metadata.get('policy_name', 'User Policy'),
+                "sections_mentioned": metadata.get('sections_mentioned', []),
+                "monetary_limits": metadata.get('monetary_limits', []),
+                "similarity": round(similarity, 3)
+            })
+        
+        return formatted_results
+
 
 # Convenience functions for agent tools
 def lookup_irdai_regulation(query: str) -> str:
@@ -194,6 +244,28 @@ def lookup_cghs_rate(procedure: str) -> str:
         return f"No valid CGHS rates found for: {procedure}"
     
     return "\n".join(rate_info)
+
+
+def lookup_policy_clause(query: str) -> str:
+    """
+    Agent tool: Look up user's policy for relevant clauses.
+    Returns formatted policy excerpt.
+    """
+    rag = BillShieldRAG()
+    results = rag.search_policy(query, n_results=2)
+    
+    if not results:
+        return "No policy document found. User has not uploaded their insurance policy."
+    
+    # Format results
+    citations = []
+    for i, result in enumerate(results, 1):
+        citations.append(
+            f"[{i}] {result['policy_name']} (Page {result['page']}, Section: {result['section']})\n"
+            f"Excerpt: {result['text'][:300]}..."
+        )
+    
+    return "\n\n".join(citations)
 
 
 if __name__ == "__main__":

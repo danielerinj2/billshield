@@ -47,7 +47,21 @@ def load_irdai_to_chromadb(chunks_path: str, collection_name: str = "irdai_regul
     for chunk in chunks:
         ids.append(chunk['chunk_id'])
         documents.append(chunk['text'])
-        metadatas.append(chunk['metadata'])
+
+        metadata = chunk["metadata"]
+
+        clean_metadata = {}
+        for key, value in metadata.items():
+            if value is None:
+                continue
+            if isinstance(value, list):
+                if len(value) == 0:
+                    continue
+                clean_metadata[key] = ", ".join(str(v) for v in value)
+            else:
+                clean_metadata[key] = value
+
+        metadatas.append(clean_metadata)
 
     batch_size = 100
     for i in range(0, len(ids), batch_size):
@@ -225,6 +239,79 @@ def load_reference_data_to_chromadb(reference_dir: str = "data/reference"):
         print(f"  ✅ Loaded {len(items)} {doc_type} entries")
 
     print(f"\n✅ Total reference items loaded: {total_loaded}")
+    return collection
+
+
+def load_policy_to_chromadb(
+    chunks_path: str,
+    collection_name: str = "user_policy"
+):
+    """
+    Load user policy chunks into ChromaDB.
+    Each user gets their own collection to prevent data mixing.
+    """
+    chroma_client = chromadb.PersistentClient(path="data/chromadb")
+    embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+        model_name="all-MiniLM-L6-v2"
+    )
+    
+    # Delete existing collection if exists
+    try:
+        collection = chroma_client.get_collection(
+            name=collection_name,
+            embedding_function=embedding_fn
+        )
+        print(f"Found existing collection '{collection_name}', deleting...")
+        chroma_client.delete_collection(name=collection_name)
+    except:
+        pass
+    
+    # Create new collection
+    collection = chroma_client.create_collection(
+        name=collection_name,
+        embedding_function=embedding_fn,
+        metadata={"description": "User-uploaded insurance policy"}
+    )
+    
+    # Load chunks
+    with open(chunks_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    chunks = data['chunks']
+    print(f"\nLoading {len(chunks)} policy chunks into ChromaDB...")
+    
+    # Prepare data
+    ids = []
+    documents = []
+    metadatas = []
+    
+    for chunk in chunks:
+        ids.append(chunk['chunk_id'])
+        documents.append(chunk['text'])
+
+        metadata = chunk["metadata"]
+
+        clean_metadata = {}
+        for key, value in metadata.items():
+            if value is None:
+                continue
+            if isinstance(value, list):
+                if len(value) == 0:
+                    continue
+                clean_metadata[key] = ", ".join(str(v) for v in value)
+            else:
+                clean_metadata[key] = value
+
+        metadatas.append(clean_metadata)
+    
+    # Add to collection
+    collection.add(
+        ids=ids,
+        documents=documents,
+        metadatas=metadatas
+    )
+    
+    print(f"✅ Loaded {collection.count()} policy chunks into '{collection_name}'")
     return collection
 
 
