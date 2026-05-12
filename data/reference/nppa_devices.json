@@ -1,60 +1,23 @@
-{
-  "stents": {
-    "bare_metal_stent_bms": {
-      "ceiling_inr": 10762.15,
-      "gst_inclusive": false,
-      "source_notification": "NPPA S.O. on coronary stents",
-      "effective_from": "2026-04-01",
-      "notes": "Per stent. GST charged additionally."
-    },
-    "drug_eluting_stent_des": {
-      "ceiling_inr": 39186.03,
-      "gst_inclusive": false,
-      "includes": ["metallic DES", "bioresorbable vascular scaffolds (BVS)", "biodegradable polymer stents"],
-      "source_notification": "NPPA S.O. on coronary stents",
-      "effective_from": "2026-04-01",
-      "notes": "Per stent. GST charged additionally."
-    }
+[
+  {
+    "device_name": "Drug-Eluting Coronary Stent (DES)",
+    "specifications": "Coronary stent with drug coating",
+    "ceiling_price_inr": 30000,
+    "category": "cardiovascular_implant",
+    "nppa_notification": "S.O. 2080(E) dated 27.02.2017"
   },
-  "knee_implants": {
-    "gst_additional_percent": 5,
-    "primary_components": {
-      "femur_titanium": {"ceiling_inr": 42614, "material": "Titanium"},
-      "femur_oxidized_zirconium": {"ceiling_inr": 42614, "material": "Oxidized Zirconium"},
-      "femur_hi_flex": {"ceiling_inr": 28446, "material": "Hi-Flex"},
-      "femur_co_cr": {"ceiling_inr": 26499, "material": "Cobalt-Chromium"},
-      "tibia_titanium": {"ceiling_inr": 26708, "material": "Titanium"},
-      "tibia_co_cr": {"ceiling_inr": 18689, "material": "Cobalt-Chromium"},
-      "insert_any_material": {"ceiling_inr": 10505, "material": "Any"},
-      "patella_any_material": {"ceiling_inr": 4499, "material": "Any"},
-      "monoblock_all_poly": {"ceiling_inr": 14256, "material": "Polyethylene only"},
-      "monoblock_metallic_tibia_with_poly": {"ceiling_inr": 29200, "material": "Metallic tibia + polyethylene insert"}
-    },
-    "revision_components": {
-      "femur_any": {"ceiling_inr": 69047, "material": "Any"},
-      "tibia_any": {"ceiling_inr": 34342, "material": "Any"},
-      "insert_any": {"ceiling_inr": 17457, "material": "Any"},
-      "patella_any": {"ceiling_inr": 4499, "material": "Any"}
-    },
-    "source_notification": "NPPA Notification on Orthopaedic Knee Implants",
-    "notes": "Prices exclude GST. 5% GST charged additionally. A typical primary total knee replacement (TKR) uses one femur + one tibia + one insert + one patella component."
+  {
+    "device_name": "Bare Metal Stent (BMS)",
+    "specifications": "Coronary stent without drug coating",
+    "ceiling_price_inr": 7260,
+    "category": "cardiovascular_implant",
+    "nppa_notification": "S.O. 2080(E) dated 27.02.2017"
   },
-  "monitored_non_scheduled_devices": {
-    "regulatory_basis": "Para 20, DPCO 2013",
-    "rule": "Manufacturer cannot increase price more than 10% in preceding 12 months",
-    "categories": [
-      "Catheters", "Intra-Ocular Lenses (IOL)", "Bone Cement", "Sutures",
-      "Surgical Instruments", "Non-cardiac implants", "General hospital devices",
-      "Surgical Dressings", "Blood/Blood Component Bags", "Dialysis Machines"
-    ],
-    "notes": "These devices have no fixed ceiling price but their MRP must comply with the 10% YoY cap."
-  },
-  "trade_margin_caps": {
-    "covid19_essential_devices": {
-      "cap_percent": 70,
-      "devices": ["Oxygen Concentrator", "Pulse Oximeter", "Blood Pressure Monitor",
-                  "Nebulizer", "Digital Thermometer", "Glucometer"],
-      "source": "NPPA Orders dated 03.06.2021 and 13.07.2021"
-    }
+  {
+    "device_name": "Knee Implant",
+    "specifications": "Total knee replacement implant",
+    "ceiling_price_inr": 54720,
+    "category": "orthopedic_implant",
+    "nppa_notification": "S.O. 1080(E) dated 14.02.2017"
   }
-}
+]

@@ -1,0 +1,675 @@
+"""
+BillShield Agent Core - SPAOR orchestrator for bill analysis.
+"""
+import json
+from typing import Dict, List, Any
+from dataclasses import dataclass, asdict
+from enum import Enum
+
+
+class IssueType(Enum):
+    """Types of billing issues the agent can detect."""
+    PROCEDURE_OVERCHARGE = "procedure_overcharge"
+    DRUG_OVERCHARGE = "drug_overcharge"
+    DEVICE_OVERCHARGE = "device_overcharge"
+    NON_PAYABLE_ITEM = "non_payable_item"
+    DUPLICATE_BILLING = "duplicate_billing"
+    UNBUNDLED_CHARGES = "unbundled_charges"
+    REJECTION_INVALID = "rejection_invalid"
+    REJECTION_DELAYED = "rejection_delayed"
+    POLICY_VIOLATION = "policy_violation"
+    MISSING_ITEMIZATION = "missing_itemization"
+
+
+class Confidence(Enum):
+    """Confidence levels for flagged issues."""
+    HIGH = "high"      # Verifiable against benchmark (MRP, CGHS, NPPA)
+    MEDIUM = "medium"  # Statistical outlier, indirect evidence
+    LOW = "low"        # Suspicious but unverifiable
+
+
+@dataclass
+class BillingIssue:
+    """Represents a single flagged issue in the bill."""
+    issue_id: str
+    issue_type: IssueType
+    description: str
+    billed_amount: float
+    benchmark_amount: float | None
+    overcharge_amount: float | None
+    confidence: Confidence
+    evidence: List[str]  # Citations, sources
+    action_required: str  # What Ankit should do
+    
+    def to_dict(self):
+        """Convert to dictionary for JSON serialization."""
+        return {
+            **asdict(self),
+            'issue_type': self.issue_type.value,
+            'confidence': self.confidence.value
+        }
+
+
+@dataclass
+class AnalysisResult:
+    """Complete bill analysis result."""
+    total_bill: float
+    total_approved: float
+    total_rejected: float
+    total_patient_liability: float
+    total_verified_overcharge: float
+    estimated_recoverable: Dict[str, float]  # min, max range
+    issues: List[BillingIssue]
+    summary: str
+    recommendations: List[str]
+    
+    def to_dict(self):
+        """Convert to dictionary for JSON serialization."""
+        return {
+            **asdict(self),
+            'issues': [issue.to_dict() for issue in self.issues]
+        }
+
+
+class BillShieldAgent:
+    """
+    Main agent orchestrator for bill analysis.
+    Implements SPAOR pattern: Search, Plan, Act, Observe, Reflect.
+    """
+    
+    def __init__(self, rag_system=None):
+        """
+        Initialize agent with RAG system.
+        
+        Args:
+            rag_system: BillShieldRAG instance (from your Day 3-4 work)
+        """
+        self.rag = rag_system
+        self.issue_counter = 0
+    
+    def analyze(
+        self,
+        bill_data: Dict,
+        discharge_data: Dict | None = None,
+        rejection_data: Dict | None = None,
+        policy_available: bool = False
+    ) -> AnalysisResult:
+        """
+        Main entry point: analyze uploaded documents and generate report.
+        
+        Args:
+            bill_data: Parsed bill JSON (from your Day 2 parser)
+            discharge_data: Parsed discharge JSON (optional)
+            rejection_data: Parsed rejection JSON (optional)
+            policy_available: Whether user uploaded policy (for RAG query)
+        
+        Returns:
+            AnalysisResult with flagged issues and recommendations
+        """
+        print(f"\n{'='*70}")
+        print("BillShield Agent Starting Analysis")
+        print(f"{'='*70}\n")
+        
+        # STEP 1: PLAN - Identify what needs to be analyzed
+        issues = []
+        
+        # Check bill line items
+        print("📋 Analyzing bill line items...")
+        issues.extend(self._analyze_bill_line_items(bill_data))
+        
+        # Cross-reference with discharge summary
+        if discharge_data:
+            print("📄 Cross-referencing discharge summary...")
+            issues.extend(self._cross_reference_discharge(bill_data, discharge_data))
+        
+        # Analyze insurance rejection
+        if rejection_data:
+            print("🔍 Analyzing insurance rejection...")
+            issues.extend(self._analyze_rejection(rejection_data, bill_data))
+        
+        # Check policy compliance
+        if policy_available:
+            print("📑 Checking policy terms...")
+            issues.extend(self._check_policy_compliance(bill_data, rejection_data))
+        
+        # STEP 2: REFLECT - Generate summary and recommendations
+        print(f"\n✅ Found {len(issues)} potential issues")
+        print("🧮 Calculating totals and confidence scores...\n")
+        
+        result = self._generate_result(bill_data, rejection_data, issues)
+        
+        print(f"{'='*70}")
+        print(f"Analysis Complete: {len(result.issues)} issues flagged")
+        print(f"Estimated Recoverable: ₹{result.estimated_recoverable['min']:,.0f} - ₹{result.estimated_recoverable['max']:,.0f}")
+        print(f"{'='*70}\n")
+        
+        return result
+    
+    def _analyze_bill_line_items(self, bill_data: Dict) -> List[BillingIssue]:
+        """
+        STEP 2: ACT - Analyze each line item against benchmarks.
+        """
+        issues = []
+        line_items = bill_data.get('line_items', [])
+        
+        for item in line_items:
+            description = item.get('description', '').lower()
+            amount = item.get('amount', 0)
+            
+            if amount == 0:
+                continue
+            
+            # Route to appropriate benchmark check
+            # CHECK DEVICES FIRST (before drugs, since "stent" contains device keywords)
+            if any(keyword in description for keyword in ['stent', 'pacemaker', 'implant', 'catheter', 'valve', 'mesh', 'prosthesis']):
+                issue = self._check_device_price(item)
+                if issue:
+                    issues.append(issue)
+            
+            elif any(keyword in description for keyword in ['medicine', 'drug', 'tablet', 'syrup', 'injection']):
+                issue = self._check_drug_price(item)
+                if issue:
+                    issues.append(issue)
+            
+            elif any(keyword in description for keyword in ['ct scan', 'mri', 'x-ray', 'xray', 'ultrasound', 'ecg', 'echo', 'echocardiography']):
+                issue = self._check_diagnostic_charges(item)
+                if issue:
+                    issues.append(issue)
+            
+            elif any(keyword in description for keyword in ['consultation', 'doctor', 'specialist', 'visit', 'consultant']):
+                issue = self._check_consultation_charges(item)
+                if issue:
+                    issues.append(issue)
+            
+            elif any(keyword in description for keyword in ['icu', 'room', 'bed', 'ward']):
+                issue = self._check_room_charges(item)
+                if issue:
+                    issues.append(issue)
+            
+            elif any(keyword in description for keyword in ['consumable', 'disposable', 'gloves', 'syringe']):
+                issue = self._check_consumables(item)
+                if issue:
+                    issues.append(issue)
+        
+        return issues
+    
+    def _check_drug_price(self, item: Dict) -> BillingIssue | None:
+        """Check drug pricing against NPPA ceiling."""
+        if not self.rag:
+            return None
+        
+        description = item.get('description', '')
+        amount = item.get('amount', 0)
+        
+        # STEP 3: SEARCH - Query RAG for NPPA price
+        nppa_results = self.rag.reference_collection.query(
+            query_texts=[description],
+            n_results=3,
+            where={"type": "nppa_drug"}
+        )
+        
+        if not nppa_results['metadatas'][0]:
+            return None
+        
+        best_match = nppa_results['metadatas'][0][0]
+        ceiling_price = best_match.get('ceiling_price', 0)
+        
+        if ceiling_price and amount > ceiling_price * 1.2:
+            self.issue_counter += 1
+            overcharge = amount - ceiling_price
+            
+            return BillingIssue(
+                issue_id=f"DRUG_{self.issue_counter:03d}",
+                issue_type=IssueType.DRUG_OVERCHARGE,
+                description=f"{description} exceeds NPPA ceiling price",
+                billed_amount=amount,
+                benchmark_amount=ceiling_price,
+                overcharge_amount=overcharge,
+                confidence=Confidence.HIGH,
+                evidence=[
+                    f"NPPA ceiling price: ₹{ceiling_price:,.2f}",
+                    f"Billed amount: ₹{amount:,.2f}",
+                    f"Drug match: {best_match.get('drug_name', 'Unknown')}"
+                ],
+                action_required="Challenge drug pricing using NPPA ceiling price"
+            )
+        
+        return None
+
+    def _check_device_price(self, item: Dict) -> BillingIssue | None:
+        """Check medical device pricing against NPPA ceiling."""
+        if not self.rag:
+            return None
+        
+        description = item.get('description', '')
+        amount = item.get('amount', 0)
+
+        if any(word in description.lower() for word in ["stent", "drug-eluting", "drug eluting", "des"]):
+            device_results = self.rag.reference_collection.query(
+                query_texts=["drug eluting stent coronary stent DES"],
+                n_results=10,
+                where={"type": "nppa_device"}
+            )
+
+            candidates = []
+            for doc, metadata, distance in zip(
+                device_results["documents"][0],
+                device_results["metadatas"][0],
+                device_results["distances"][0],
+            ):
+                combined = f"{doc} {metadata}".lower()
+                if "stent" in combined and ("drug" in combined or "eluting" in combined or "des" in combined):
+                    candidates.append((metadata, distance))
+
+            if candidates:
+                best_match = candidates[0][0]
+                ceiling_price = best_match.get("ceiling_price", 0)
+
+                if ceiling_price and amount > ceiling_price * 1.05:
+                    self.issue_counter += 1
+                    overcharge = amount - ceiling_price
+
+                    return BillingIssue(
+                        issue_id=f"DEVICE_{self.issue_counter:03d}",
+                        issue_type=IssueType.DEVICE_OVERCHARGE,
+                        description=f"{description} exceeds NPPA ceiling price for drug-eluting stent",
+                        billed_amount=amount,
+                        benchmark_amount=ceiling_price,
+                        overcharge_amount=overcharge,
+                        confidence=Confidence.HIGH,
+                        evidence=[
+                            f"NPPA ceiling: ₹{ceiling_price:,.2f}",
+                            f"Billed amount: ₹{amount:,.2f}",
+                            f"Overcharge: ₹{overcharge:,.2f}",
+                            "Matched as drug-eluting coronary stent device"
+                        ],
+                        action_required="Challenge stent pricing using NPPA device ceiling and request manufacturer invoice"
+                    )
+        
+        # Query NPPA devices collection specifically
+        try:
+            device_results = self.rag.reference_collection.query(
+                query_texts=[description],
+                n_results=3,
+                where={"type": "nppa_device"}
+            )
+        except:
+            return None  # Collection query failed
+        
+        if not device_results['documents'][0]:
+            # No device match, try generic CGHS lookup as fallback
+            cghs_results = self.rag.search_cghs_rates(description, n_results=3)
+            if cghs_results and cghs_results[0]['rate'] > 0:
+                cghs_rate = cghs_results[0]['rate']
+                if amount > cghs_rate * 2:  # 100% markup threshold
+                    self.issue_counter += 1
+                    overcharge = amount - cghs_rate
+                    
+                    return BillingIssue(
+                        issue_id=f"DEVICE_{self.issue_counter:03d}",
+                        issue_type=IssueType.DEVICE_OVERCHARGE,
+                        description=f"{description} exceeds CGHS benchmark (NPPA device data unavailable)",
+                        billed_amount=amount,
+                        benchmark_amount=cghs_rate,
+                        overcharge_amount=overcharge,
+                        confidence=Confidence.MEDIUM,
+                        evidence=[
+                            f"CGHS benchmark: ₹{cghs_rate:,.2f}",
+                            f"Billed amount: ₹{amount:,.2f}",
+                            "NPPA device ceiling not found; using CGHS as reference"
+                        ],
+                        action_required="Request itemized device bill with manufacturer invoice"
+                    )
+            return None
+        
+        # Found device match
+        best_match = device_results['metadatas'][0][0]
+        ceiling_price = best_match.get('ceiling_price', 0)
+        similarity = 1 - device_results['distances'][0][0]
+        
+        if similarity < 0.5 or ceiling_price == 0:
+            return None
+        
+        if amount > ceiling_price * 1.05:  # 5% tolerance
+            self.issue_counter += 1
+            overcharge = amount - ceiling_price
+            
+            return BillingIssue(
+                issue_id=f"DEVICE_{self.issue_counter:03d}",
+                issue_type=IssueType.DEVICE_OVERCHARGE,
+                description=f"{description} exceeds NPPA ceiling price",
+                billed_amount=amount,
+                benchmark_amount=ceiling_price,
+                overcharge_amount=overcharge,
+                confidence=Confidence.HIGH,
+                evidence=[
+                    f"NPPA ceiling: ₹{ceiling_price:,.2f}",
+                    f"Billed amount: ₹{amount:,.2f}",
+                    f"Overcharge: ₹{overcharge:,.2f}"
+                ],
+                action_required="Challenge device pricing using NPPA ceiling price"
+            )
+        
+        return None
+    
+    def _check_room_charges(self, item: Dict) -> BillingIssue | None:
+        """Check room/ICU charges against CGHS rates."""
+        if not self.rag:
+            return None
+        
+        description = item.get('description', '')
+        amount = item.get('amount', 0)
+        
+        cghs_results = self.rag.search_cghs_rates(description, n_results=3)
+        
+        valid_results = [r for r in cghs_results if r.get('rate', 0) > 0]
+        if not valid_results:
+            return None
+        
+        best_match = valid_results[0]
+        cghs_rate = best_match['rate']
+        
+        if cghs_rate and amount > cghs_rate * 1.5:  # 150% markup threshold
+            self.issue_counter += 1
+            overcharge = amount - cghs_rate
+            
+            return BillingIssue(
+                issue_id=f"ROOM_{self.issue_counter:03d}",
+                issue_type=IssueType.PROCEDURE_OVERCHARGE,
+                description=f"{description} significantly exceeds CGHS room/ICU benchmark",
+                billed_amount=amount,
+                benchmark_amount=cghs_rate,
+                overcharge_amount=overcharge,
+                confidence=Confidence.HIGH,
+                evidence=[
+                    f"CGHS rate: ₹{cghs_rate:,.2f}",
+                    f"Billed amount: ₹{amount:,.2f}",
+                    f"Markup: {(amount/cghs_rate - 1)*100:.0f}%",
+                    f"Procedure: {best_match['procedure']}"
+                ],
+                action_required="Request hospital's rate card justification for room/ICU markup"
+            )
+        
+        return None
+    
+    def _check_diagnostic_charges(self, item: Dict) -> BillingIssue | None:
+        """Check diagnostic test charges against CGHS rates."""
+        if not self.rag:
+            return None
+
+        description = item.get('description', '')
+        amount = item.get('amount', 0)
+
+        cghs_results = self.rag.search_cghs_rates(description, n_results=3)
+
+        valid_results = [r for r in cghs_results if r.get('rate', 0) > 0]
+        if not valid_results:
+            return None
+
+        best_match = valid_results[0]
+        cghs_rate = best_match['rate']
+
+        if cghs_rate and amount > cghs_rate * 1.5:
+            self.issue_counter += 1
+            overcharge = amount - cghs_rate
+
+            return BillingIssue(
+                issue_id=f"DIAG_{self.issue_counter:03d}",
+                issue_type=IssueType.PROCEDURE_OVERCHARGE,
+                description=f"{description} significantly exceeds CGHS diagnostic benchmark",
+                billed_amount=amount,
+                benchmark_amount=cghs_rate,
+                overcharge_amount=overcharge,
+                confidence=Confidence.HIGH,
+                evidence=[
+                    f"CGHS rate: ₹{cghs_rate:,.2f}",
+                    f"Billed amount: ₹{amount:,.2f}",
+                    f"Markup: {(amount/cghs_rate - 1)*100:.0f}%",
+                    f"Procedure: {best_match['procedure']}"
+                ],
+                action_required="Challenge diagnostic charge using CGHS benchmark"
+            )
+
+        return None
+    
+    def _check_consultation_charges(self, item: Dict) -> BillingIssue | None:
+        """Check consultation charges against CGHS rates."""
+        if not self.rag:
+            return None
+
+        description = item.get('description', '')
+        amount = item.get('amount', 0)
+
+        cghs_results = self.rag.search_cghs_rates(description, n_results=3)
+
+        valid_results = [r for r in cghs_results if r.get('rate', 0) > 0]
+        if not valid_results:
+            return None
+
+        best_match = valid_results[0]
+        cghs_rate = best_match['rate']
+
+        if cghs_rate and amount > cghs_rate * 1.5:
+            self.issue_counter += 1
+            overcharge = amount - cghs_rate
+
+            return BillingIssue(
+                issue_id=f"CONSULT_{self.issue_counter:03d}",
+                issue_type=IssueType.PROCEDURE_OVERCHARGE,
+                description=f"{description} significantly exceeds CGHS consultation benchmark",
+                billed_amount=amount,
+                benchmark_amount=cghs_rate,
+                overcharge_amount=overcharge,
+                confidence=Confidence.HIGH,
+                evidence=[
+                    f"CGHS rate: ₹{cghs_rate:,.2f}",
+                    f"Billed amount: ₹{amount:,.2f}",
+                    f"Markup: {(amount/cghs_rate - 1)*100:.0f}%",
+                    f"Procedure: {best_match['procedure']}"
+                ],
+                action_required="Challenge consultation charge using CGHS benchmark"
+            )
+
+        return None
+    
+    def _check_consumables(self, item: Dict) -> BillingIssue | None:
+        """Flag aggregated consumables without itemization."""
+        description = item.get('description', '')
+        amount = item.get('amount', 0)
+        
+        if amount > 10000 and 'consumable' in description.lower():
+            self.issue_counter += 1
+            
+            return BillingIssue(
+                issue_id=f"CONS_{self.issue_counter:03d}",
+                issue_type=IssueType.MISSING_ITEMIZATION,
+                description=f"High-value consumables billed without itemization",
+                billed_amount=amount,
+                benchmark_amount=None,
+                overcharge_amount=None,
+                confidence=Confidence.MEDIUM,
+                evidence=[
+                    f"Aggregated charge: ₹{amount:,.2f}",
+                    "No itemized breakdown provided",
+                    "Per Consumer Protection Act, itemization is mandatory for charges > ₹5,000"
+                ],
+                action_required="Request itemized consumables list with quantities and rates"
+            )
+        
+        return None
+    
+    def _cross_reference_discharge(self, bill_data: Dict, discharge_data: Dict) -> List[BillingIssue]:
+        """Cross-reference bill against discharge summary for discrepancies."""
+        issues = []
+        
+        # Check consultation count discrepancy
+        consultation_items = [
+            item for item in bill_data.get('line_items', [])
+            if 'consult' in item.get('description', '').lower()
+        ]
+        
+        # Count unique consultations billed
+        billed_consultations = len(consultation_items)
+        
+        # Count procedures in discharge (proxy for actual consultations)
+        discharge_procedures = len(discharge_data.get('procedures', []))
+        
+        # Check for discrepancy (billed > actual by 2+)
+        if billed_consultations > discharge_procedures + 1:
+            self.issue_counter += 1
+            
+            total_consult_charges = sum(item.get('amount', 0) for item in consultation_items)
+            excess_consultations = billed_consultations - discharge_procedures
+            estimated_overcharge = total_consult_charges * (excess_consultations / billed_consultations)
+            
+            issues.append(BillingIssue(
+                issue_id=f"DISC_{self.issue_counter:03d}",
+                issue_type=IssueType.DUPLICATE_BILLING,
+                description=f"Bill lists {billed_consultations} consultations but discharge summary documents {discharge_procedures} procedures",
+                billed_amount=total_consult_charges,
+                benchmark_amount=total_consult_charges - estimated_overcharge,
+                overcharge_amount=estimated_overcharge,
+                confidence=Confidence.MEDIUM,
+                evidence=[
+                    f"Consultations billed: {billed_consultations}",
+                    f"Procedures in discharge: {discharge_procedures}",
+                    f"Potential duplicate/phantom consultations: {excess_consultations}",
+                    "Discharge summary is the authoritative record of care provided"
+                ],
+                action_required="Request detailed consultation log with doctor names, dates, and times"
+            ))
+        
+        # Check for procedure discrepancies
+        bill_procedures = [
+            item.get('description', '') for item in bill_data.get('line_items', [])
+            if any(keyword in item.get('description', '').lower() 
+                  for keyword in ['surgery', 'procedure', 'operation', 'angioplasty', 'bypass'])
+        ]
+        
+        discharge_procedure_names = [
+            proc.get('name', '') for proc in discharge_data.get('procedures', [])
+        ]
+        
+        # Simple check: are major procedures in bill also in discharge?
+        # (This is a basic heuristic - real implementation would need fuzzy matching)
+        
+        return issues
+    
+    def _analyze_rejection(self, rejection_data: Dict, bill_data: Dict) -> List[BillingIssue]:
+        """Analyze insurance rejection for IRDAI compliance."""
+        issues = []
+        
+        timeline = rejection_data.get('timeline', {})
+        rejection_days = timeline.get('discharge_to_rejection_days', 0)
+        
+        if rejection_days > 15:
+            self.issue_counter += 1
+            
+            # Query IRDAI for 15-day rule
+            if self.rag:
+                irdai_results = self.rag.search_irdai_regulations(
+                    "15 day claim settlement timeline",
+                    n_results=2,
+                    min_similarity=0.3
+                )
+                
+                financial_summary = rejection_data.get('financial_summary', {})
+                rejected_amount = financial_summary.get('amount_rejected', 0)
+                
+                evidence = [
+                    f"Rejection received {rejection_days} days after discharge",
+                    "IRDAI mandates 15-day settlement timeline",
+                    "Delay triggers auto-approval or interest penalty"
+                ]
+                
+                if irdai_results:
+                    evidence.append(f"Citation: {irdai_results[0]['reference']}, Page {irdai_results[0]['page']}")
+                
+                issues.append(BillingIssue(
+                    issue_id=f"REJ_{self.issue_counter:03d}",
+                    issue_type=IssueType.REJECTION_DELAYED,
+                    description="Claim settlement exceeded IRDAI 15-day timeline",
+                    billed_amount=rejected_amount,
+                    benchmark_amount=None,
+                    overcharge_amount=rejected_amount,
+                    confidence=Confidence.HIGH,
+                    evidence=evidence,
+                    action_required="File escalation citing IRDAI timeline violation and request interest at bank rate + 2%"
+                ))
+        
+        return issues
+    
+    def _check_policy_compliance(self, bill_data: Dict, rejection_data: Dict | None) -> List[BillingIssue]:
+        """Check rejected items against user's policy terms."""
+        issues = []
+        
+        # Query user's policy for exclusions
+        # TODO: Implement policy RAG query
+        
+        return issues
+    
+    def _generate_result(self, bill_data: Dict, rejection_data: Dict | None, issues: List[BillingIssue]) -> AnalysisResult:
+        """Generate final analysis result with summary and recommendations."""
+        
+        # Calculate totals - handle nested schema from parsers
+        totals = bill_data.get('totals', {})
+        total_bill = totals.get('extracted_grand_total', 0)
+        
+        if rejection_data:
+            fin_summary = rejection_data.get('financial_summary', {})
+            total_approved = fin_summary.get('amount_settled', 0)
+            total_rejected = fin_summary.get('amount_rejected', 0)
+        else:
+            total_approved = 0
+            total_rejected = 0
+        
+        total_patient_liability = total_bill - total_approved
+        
+        # Calculate verified overcharge
+        verified_overcharge = sum(
+            issue.overcharge_amount for issue in issues
+            if issue.confidence == Confidence.HIGH and issue.overcharge_amount
+        )
+        
+        # Estimate recoverable range
+        high_conf_total = sum(issue.overcharge_amount or 0 for issue in issues if issue.confidence == Confidence.HIGH)
+        medium_conf_total = sum(issue.overcharge_amount or 0 for issue in issues if issue.confidence == Confidence.MEDIUM)
+        
+        estimated_recoverable = {
+            'min': high_conf_total,
+            'max': high_conf_total + medium_conf_total * 0.6
+        }
+        
+        # Generate summary
+        high_issues = [i for i in issues if i.confidence == Confidence.HIGH]
+        summary = f"Found {len(issues)} potential issues ({len(high_issues)} high confidence). "
+        summary += f"Verified overcharges total ₹{verified_overcharge:,.0f}. "
+        summary += f"Estimated recoverable: ₹{estimated_recoverable['min']:,.0f} to ₹{estimated_recoverable['max']:,.0f}."
+        
+        # Generate recommendations
+        recommendations = [
+            f"Present evidence for {len(high_issues)} high-confidence overcharges (total ₹{high_conf_total:,.0f})",
+            "Request itemized breakdown for all aggregated charges",
+            "Cite CGHS/NPPA benchmarks when challenging specific line items"
+        ]
+        
+        timeline = rejection_data.get('timeline', {}) if rejection_data else {}
+        if timeline.get('discharge_to_rejection_days', 0) > 15:
+            recommendations.append("File IRDAI escalation for delayed settlement (auto-approval rule)")
+        
+        return AnalysisResult(
+            total_bill=total_bill,
+            total_approved=total_approved,
+            total_rejected=total_rejected,
+            total_patient_liability=total_patient_liability,
+            total_verified_overcharge=verified_overcharge,
+            estimated_recoverable=estimated_recoverable,
+            issues=issues,
+            summary=summary,
+            recommendations=recommendations
+        )
+
+
+if __name__ == "__main__":
+    print("BillShield Agent Core - Ready for integration")
+    print("Import with: from src.agent.core import BillShieldAgent")
