@@ -2,22 +2,65 @@
   {
     "device_name": "Drug-Eluting Coronary Stent (DES)",
     "specifications": "Coronary stent with drug coating",
-    "ceiling_price_inr": 30000,
+    "ceiling_price_inr": 39186,
     "category": "cardiovascular_implant",
-    "nppa_notification": "S.O. 2080(E) dated 27.02.2017"
+    "nppa_notification": "NPPA Revision April 2026",
+    "source": "capstone_verification_rules.pdf",
+    "effective_date": "2026-04-01"
   },
   {
     "device_name": "Bare Metal Stent (BMS)",
     "specifications": "Coronary stent without drug coating",
-    "ceiling_price_inr": 7260,
+    "ceiling_price_inr": 10762,
     "category": "cardiovascular_implant",
-    "nppa_notification": "S.O. 2080(E) dated 27.02.2017"
+    "nppa_notification": "NPPA Revision April 2026",
+    "source": "capstone_verification_rules.pdf",
+    "effective_date": "2026-04-01"
   },
   {
-    "device_name": "Knee Implant",
-    "specifications": "Total knee replacement implant",
-    "ceiling_price_inr": 54720,
+    "device_name": "Total Knee Replacement (Complete)",
+    "specifications": "Femur + Tibia + Insert + Patella (highest grade components)",
+    "ceiling_price_inr": 84326,
     "category": "orthopedic_implant",
-    "nppa_notification": "S.O. 1080(E) dated 14.02.2017"
+    "nppa_notification": "NPPA Knee Implant Price Cap 2025",
+    "source": "nppa_devices_knee_implants_2025.pdf",
+    "components": {
+      "femur": 42614,
+      "tibia": 26708,
+      "insert": 10505,
+      "patella": 4499
+    }
+  },
+  {
+    "device_name": "Knee Implant - Femur Component",
+    "specifications": "Femoral component (Titanium/Oxidized Zirconium)",
+    "ceiling_price_inr": 42614,
+    "category": "orthopedic_implant",
+    "nppa_notification": "NPPA Knee Implant Price Cap 2025",
+    "source": "nppa_devices_knee_implants_2025.pdf"
+  },
+  {
+    "device_name": "Knee Implant - Tibia Component",
+    "specifications": "Tibial component (Titanium/Co-Cr)",
+    "ceiling_price_inr": 26708,
+    "category": "orthopedic_implant",
+    "nppa_notification": "NPPA Knee Implant Price Cap 2025",
+    "source": "nppa_devices_knee_implants_2025.pdf"
+  },
+  {
+    "device_name": "Knee Implant - Revision Femur",
+    "specifications": "Revision femoral component",
+    "ceiling_price_inr": 69047,
+    "category": "orthopedic_implant",
+    "nppa_notification": "NPPA Knee Implant Price Cap 2025",
+    "source": "nppa_devices_knee_implants_2025.pdf"
+  },
+  {
+    "device_name": "Knee Implant - Revision Tibia",
+    "specifications": "Revision tibial component",
+    "ceiling_price_inr": 34342,
+    "category": "orthopedic_implant",
+    "nppa_notification": "NPPA Knee Implant Price Cap 2025",
+    "source": "nppa_devices_knee_implants_2025.pdf"
   }
 ]

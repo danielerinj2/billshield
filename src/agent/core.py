@@ -5,6 +5,7 @@ import json
 from typing import Dict, List, Any
 from dataclasses import dataclass, asdict
 from enum import Enum
+from src.agent.multi_procedure_detection import detect_multi_procedure_violations, validate_settlement_timelines
 
 
 class IssueType(Enum):
@@ -121,6 +122,11 @@ class BillShieldAgent:
         if discharge_data:
             print("📄 Cross-referencing discharge summary...")
             issues.extend(self._cross_reference_discharge(bill_data, discharge_data))
+
+        # Check for multi-procedure billing violations
+        if discharge_data:
+            print("🔧 Checking multi-procedure billing discounts...")
+            issues.extend(self._check_multi_procedure_billing(bill_data, discharge_data))
         
         # Analyze insurance rejection
         if rejection_data:
@@ -555,6 +561,31 @@ class BillShieldAgent:
         
         return issues
     
+
+    def _check_multi_procedure_billing(self, bill_data: Dict, discharge_data: Dict) -> List[BillingIssue]:
+        """
+        Check if multiple procedures were billed at 100% violating IRDAI discount rules.
+        Uses capstone rules: primary 100%, second 50%, third+ 25%.
+        """
+        raw_issues = detect_multi_procedure_violations(bill_data, discharge_data)
+        
+        # Convert to BillingIssue format
+        issues = []
+        for raw in raw_issues:
+            issues.append(BillingIssue(
+                issue_id=raw['issue_id'],
+                issue_type=IssueType.UNBUNDLED_CHARGES,
+                description=raw['description'],
+                billed_amount=raw['billed_amount'],
+                benchmark_amount=raw['benchmark_amount'],
+                overcharge_amount=raw['overcharge_amount'],
+                confidence=Confidence.HIGH,
+                evidence=raw['evidence'],
+                action_required=raw['action_required']
+            ))
+        
+        return issues
+
     def _analyze_rejection(self, rejection_data: Dict, bill_data: Dict) -> List[BillingIssue]:
         """Analyze insurance rejection for IRDAI compliance."""
         issues = []
@@ -597,14 +628,113 @@ class BillShieldAgent:
                     action_required="File escalation citing IRDAI timeline violation and request interest at bank rate + 2%"
                 ))
         
+
+        # Check for timeline violations
+        timeline_issues = validate_settlement_timelines(rejection_data)
+        for raw in timeline_issues:
+            issues.append(BillingIssue(
+                issue_id=raw['issue_id'],
+                type=IssueType.REJECTION_DELAYED,
+                description=raw['description'],
+                amount_inr=0,
+                confidence=Confidence.MEDIUM,
+                evidence=raw['evidence'],
+                action_required=raw['action_required']
+            ))
+        
         return issues
     
     def _check_policy_compliance(self, bill_data: Dict, rejection_data: Dict | None) -> List[BillingIssue]:
-        """Check rejected items against user's policy terms."""
+        """
+        Check rejected items against user's policy terms and IRDAI regulations.
+        Detect regulation-vs-policy contradictions.
+        """
         issues = []
         
-        # Query user's policy for exclusions
-        # TODO: Implement policy RAG query
+        if not rejection_data or not self.rag:
+            return issues
+        
+        # Get rejection reasons
+        rejection_reasons = rejection_data.get('rejection_reasons', [])
+        
+        for reason_obj in rejection_reasons:
+            reason_text = reason_obj.get('reason', '')
+            rejected_amount = reason_obj.get('amount', 0)
+            
+            if not reason_text or rejected_amount == 0:
+                continue
+            
+            # Query policy for this exclusion
+            policy_results = self.rag.search_policy_exclusions(reason_text, n_results=2)
+            
+            # Query IRDAI for regulations about this type of rejection
+            irdai_results = self.rag.search_irdai_regulations(
+                f"claim rejection {reason_text}",
+                n_results=2
+            )
+            
+            # Check if policy exclusion contradicts IRDAI regulation
+            if policy_results and irdai_results:
+                policy_text = policy_results[0]['text']
+                irdai_text = irdai_results[0]['text']
+                
+                # Simple heuristic: if IRDAI mentions "must be covered" or "cannot exclude"
+                # and policy says "not covered", flag contradiction
+                if any(keyword in irdai_text.lower() for keyword in ['must cover', 'cannot exclude', 'mandatory coverage']):
+                    if any(keyword in policy_text.lower() for keyword in ['not covered', 'excluded', 'not payable']):
+                        self.issue_counter += 1
+                        
+                        issues.append(BillingIssue(
+                            issue_id=f"POL_{self.issue_counter:03d}",
+                            issue_type=IssueType.POLICY_VIOLATION,
+                            description=f"Policy exclusion may contradict IRDAI regulation: {reason_text}",
+                            billed_amount=rejected_amount,
+                            benchmark_amount=rejected_amount,
+                            overcharge_amount=rejected_amount,
+                            confidence=Confidence.MEDIUM,
+                            evidence=[
+                                f"Rejection reason: {reason_text}",
+                                f"Policy clause: {policy_results[0]['chunk_id']}",
+                                f"IRDAI regulation: {irdai_results[0]['reference']}",
+                                "Potential regulation-policy contradiction detected"
+                            ],
+                            action_required="Request insurer to cite specific IRDAI regulation allowing this exclusion"
+                        ))
+            
+            # Check if rejection reason is in IRDAI non-payable list
+            non_payable_results = self.rag.reference_collection.query(
+                query_texts=[reason_text],
+                n_results=3,
+                where={"type": "non_payable"}
+            )
+            
+            if non_payable_results['documents'][0]:
+                best_match = non_payable_results['metadatas'][0][0]
+                similarity = 1 - non_payable_results['distances'][0][0]
+                
+                # If high similarity to legitimate non-payable item, rejection is valid
+                if similarity > 0.6:
+                    # Don't flag - this is a legitimate rejection
+                    continue
+                else:
+                    # Low similarity - insurer may be citing invalid non-payable
+                    self.issue_counter += 1
+                    
+                    issues.append(BillingIssue(
+                        issue_id=f"REJ_{self.issue_counter:03d}",
+                        issue_type=IssueType.REJECTION_INVALID,
+                        description=f"Rejected item '{reason_text}' not found in IRDAI non-payable list",
+                        billed_amount=rejected_amount,
+                        benchmark_amount=rejected_amount,
+                        overcharge_amount=rejected_amount,
+                        confidence=Confidence.MEDIUM,
+                        evidence=[
+                            f"Rejection reason: {reason_text}",
+                            "Item not in IRDAI's official non-payable list",
+                            f"Closest match: {best_match.get('item', 'N/A')} (similarity: {similarity:.2f})"
+                        ],
+                        action_required="Challenge rejection citing IRDAI non-payable list as authority"
+                    ))
         
         return issues
     

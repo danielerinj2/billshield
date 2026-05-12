@@ -1,0 +1,166 @@
+{
+  "multi_procedure_billing": {
+    "rule_name": "Multi-Procedure Billing Discount",
+    "description": "When multiple surgeries happen in one OT session, only primary is 100%, second is 50%, third+ is 25%",
+    "source": "capstone_verification_rules.pdf page 1",
+    "discounts": [
+      {
+        "position": "primary",
+        "percentage": 100,
+        "description": "Highest cost procedure"
+      },
+      {
+        "position": "second",
+        "percentage": 50,
+        "description": "Second procedure in same session"
+      },
+      {
+        "position": "third_and_beyond",
+        "percentage": 25,
+        "description": "Third and subsequent procedures"
+      }
+    ],
+    "violation_type": "unbundled_charges",
+    "evidence_required": "Multiple procedures billed at 100% in same OT session"
+  },
+  "scheduled_items": {
+    "scheduled_items": [
+      {
+        "item_name": "Syringes",
+        "status": "scheduled",
+        "has_ceiling": true,
+        "source": "capstone_verification_rules.pdf page 3"
+      },
+      {
+        "item_name": "Needles",
+        "status": "scheduled",
+        "has_ceiling": true,
+        "source": "capstone_verification_rules.pdf page 3"
+      },
+      {
+        "item_name": "IV Cannulae",
+        "status": "scheduled",
+        "has_ceiling": true,
+        "source": "capstone_verification_rules.pdf page 3"
+      },
+      {
+        "item_name": "IV Fluids",
+        "status": "scheduled",
+        "has_ceiling": true,
+        "source": "capstone_verification_rules.pdf page 3"
+      }
+    ],
+    "non_scheduled_items": []
+  },
+  "timeline_requirements": [
+    {
+      "rule_name": "Cashless Pre-Authorization Timeline",
+      "requirement": "Insurer must approve within 1 hour of request",
+      "timeline_minutes": 60,
+      "violation_penalty": "Delay beyond 1 hour constitutes service violation",
+      "source": "IRDAI Master Circular 2024, page 12-13",
+      "effective_date": "2024-07-31"
+    },
+    {
+      "rule_name": "Final Authorization Timeline",
+      "requirement": "Insurer must grant final authorization within 3 hours of discharge request",
+      "timeline_minutes": 180,
+      "violation_penalty": "Additional charges borne by insurer if delayed beyond 3 hours",
+      "source": "IRDAI Master Circular 2024, page 13",
+      "effective_date": "2024-07-31"
+    },
+    {
+      "rule_name": "Complaint Resolution Timeline",
+      "requirement": "Insurers must resolve complaints within 14 days",
+      "timeline_days": 14,
+      "source": "IRDAI regulations page 14-15",
+      "effective_date": "2024-01-01"
+    }
+  ],
+  "trade_margin_caps": [
+    {
+      "device_name": "Oxygen Concentrator",
+      "max_trade_margin": 70,
+      "cap_type": "percentage",
+      "source": "NPPA orders June-July 2021",
+      "category": "covid_essential"
+    },
+    {
+      "device_name": "Pulse Oximeter",
+      "max_trade_margin": 70,
+      "cap_type": "percentage",
+      "source": "NPPA orders June-July 2021",
+      "category": "covid_essential"
+    },
+    {
+      "device_name": "Blood Pressure Monitor",
+      "max_trade_margin": 70,
+      "cap_type": "percentage",
+      "source": "NPPA orders June-July 2021",
+      "category": "covid_essential"
+    },
+    {
+      "device_name": "Nebulizer",
+      "max_trade_margin": 70,
+      "cap_type": "percentage",
+      "source": "NPPA orders June-July 2021",
+      "category": "covid_essential"
+    },
+    {
+      "device_name": "Digital Thermometer",
+      "max_trade_margin": 70,
+      "cap_type": "percentage",
+      "source": "NPPA orders June-July 2021",
+      "category": "covid_essential"
+    },
+    {
+      "device_name": "Glucometer",
+      "max_trade_margin": 70,
+      "cap_type": "percentage",
+      "source": "NPPA orders June-July 2021",
+      "category": "covid_essential"
+    }
+  ],
+  "notified_devices": [
+    {
+      "device_number": 4,
+      "device_name": "Stents",
+      "regulated_as": "Drug under Medical Devices Rules",
+      "notified_date": "2020-04-01",
+      "source": "capstone_verification_rules.pdf pages 7-10"
+    },
+    {
+      "device_number": 5,
+      "device_name": "Catheters",
+      "regulated_as": "Drug under Medical Devices Rules",
+      "notified_date": "2020-04-01",
+      "source": "capstone_verification_rules.pdf pages 7-10"
+    },
+    {
+      "device_number": 6,
+      "device_name": "Intra-Ocular Lenses",
+      "regulated_as": "Drug under Medical Devices Rules",
+      "notified_date": "2020-04-01",
+      "source": "capstone_verification_rules.pdf pages 7-10"
+    },
+    {
+      "device_number": 9,
+      "device_name": "Heart Valves",
+      "regulated_as": "Drug under Medical Devices Rules",
+      "notified_date": "2020-04-01",
+      "source": "capstone_verification_rules.pdf pages 7-10"
+    },
+    {
+      "device_number": 11,
+      "device_name": "Orthopaedic Implants",
+      "regulated_as": "Drug under Medical Devices Rules",
+      "notified_date": "2020-04-01",
+      "source": "capstone_verification_rules.pdf pages 7-10"
+    }
+  ],
+  "metadata": {
+    "source_document": "capstone_verification_rules.pdf",
+    "extraction_date": "2026-05-12",
+    "total_rules_extracted": 19
+  }
+}

@@ -5,25 +5,37 @@ import chromadb
 from chromadb.utils import embedding_functions
 from typing import List, Dict
 
+
 class BillShieldRAG:
     """RAG retrieval system for BillShield."""
     
     def __init__(self, chromadb_path: str = "data/chromadb"):
+        """Initialize RAG system with ChromaDB."""
         self.client = chromadb.PersistentClient(path=chromadb_path)
-        self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+        self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name="all-MiniLM-L6-v2"
         )
         
         # Load collections
         self.irdai_collection = self.client.get_collection(
             name="irdai_regulations",
-            embedding_function=self.embedding_fn
+            embedding_function=self.embedding_function
         )
         
         self.reference_collection = self.client.get_collection(
             name="reference_benchmarks",
-            embedding_function=self.embedding_fn
+            embedding_function=self.embedding_function
         )
+        
+        # Load policy collection (optional, might not exist)
+        try:
+            self.policy_collection = self.client.get_collection(
+                name="policy_exclusions",
+                embedding_function=self.embedding_function
+            )
+        except:
+            self.policy_collection = None
+            print("⚠️  Policy exclusions collection not found")
     
     def search_irdai_regulations(
         self, 
@@ -67,6 +79,40 @@ class BillShieldRAG:
                 })
         
         return formatted_results
+
+    def search_policy_exclusions(self, query: str, n_results: int = 3) -> List[Dict]:
+        """
+        Search sample policy exclusion clauses.
+        
+        Args:
+            query: Search query (e.g., "pre-existing condition exclusion")
+            n_results: Number of results to return
+        
+        Returns:
+            List of policy exclusion chunks with metadata
+        """
+        try:
+            results = self.policy_collection.query(
+                query_texts=[query],
+                n_results=n_results
+            )
+            
+            chunks = []
+            if results['documents'][0]:
+                for i, doc in enumerate(results['documents'][0]):
+                    metadata = results['metadatas'][0][i]
+                    chunks.append({
+                        'text': doc,
+                        'chunk_id': metadata.get('chunk_id', ''),
+                        'clause_number': metadata.get('clause_number', ''),
+                        'keywords': metadata.get('keywords', '').split(','),
+                        'similarity': 1 - results['distances'][0][i]
+                    })
+            
+            return chunks
+        except Exception as e:
+            print(f"Error searching policy exclusions: {e}")
+            return []
     
     def search_cghs_rates(
         self, 
@@ -165,7 +211,7 @@ class BillShieldRAG:
         try:
             policy_collection = self.client.get_collection(
                 name=collection_name,
-                embedding_function=self.embedding_fn
+                embedding_function=self.embedding_function
             )
         except:
             return []  # No policy loaded
@@ -277,3 +323,11 @@ if __name__ == "__main__":
     
     print("\n\n2. CGHS Rate Lookup:")
     print(lookup_cghs_rate("ICU charges"))
+    
+    print("\n\n3. Policy Exclusion Lookup:")
+    rag = BillShieldRAG()
+    policy_results = rag.search_policy_exclusions("cosmetic dental pregnancy exclusions", n_results=2)
+    for result in policy_results:
+        print(f"Clause {result['clause_number']} | Similarity: {result['similarity']:.3f}")
+        print(result['text'][:300])
+        print()

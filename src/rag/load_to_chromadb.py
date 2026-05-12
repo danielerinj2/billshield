@@ -78,6 +78,69 @@ def load_irdai_to_chromadb(chunks_path: str, collection_name: str = "irdai_regul
     return collection
 
 
+def load_policy_exclusions():
+    """Load sample policy exclusions into ChromaDB."""
+    chroma_client = chromadb.PersistentClient(path="data/chromadb")
+    embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+        model_name="all-MiniLM-L6-v2"
+    )
+
+    collection_name = "policy_exclusions"
+
+    try:
+        collection = chroma_client.get_collection(
+            name=collection_name,
+            embedding_function=embedding_fn
+        )
+        print(f"Found existing collection '{collection_name}' with {collection.count()} items")
+        print("Deleting to reload...")
+        chroma_client.delete_collection(name=collection_name)
+    except:
+        pass
+
+    collection = chroma_client.create_collection(
+        name=collection_name,
+        embedding_function=embedding_fn,
+        metadata={"description": "Sample policy exclusion clauses"}
+    )
+
+    policy_path = Path("data/reference/policy_exclusions.json")
+    if not policy_path.exists():
+        print(f"⚠️  Policy exclusions file not found: {policy_path}")
+        return None
+
+    with open(policy_path, 'r', encoding='utf-8') as f:
+        chunks = json.load(f)
+
+    print(f"\nLoading {len(chunks)} policy exclusion chunks into ChromaDB...")
+
+    batch_size = 100
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i:i + batch_size]
+
+        documents = [chunk['text'] for chunk in batch]
+        metadatas = [
+            {
+                'chunk_id': chunk['chunk_id'],
+                'clause_number': chunk['clause_number'],
+                'keywords': ','.join(chunk.get('keywords', [])),
+                'type': 'policy_exclusion'
+            }
+            for chunk in batch
+        ]
+        ids = [chunk['chunk_id'] for chunk in batch]
+
+        collection.add(
+            documents=documents,
+            metadatas=metadatas,
+            ids=ids
+        )
+        print(f"  Added batch {i//batch_size + 1}/{(len(chunks)-1)//batch_size + 1}")
+
+    print(f"\n✅ Loaded {len(chunks)} chunks into 'policy_exclusions'\n")
+    return collection
+
+
 def load_reference_data_to_chromadb(reference_dir: str = "data/reference"):
     """Load reference JSONs (CGHS, NPPA, etc) into ChromaDB."""
 
@@ -132,7 +195,7 @@ def load_reference_data_to_chromadb(reference_dir: str = "data/reference"):
             elif 'drugs' in data:
                 items = data['drugs']
             elif 'items' in data:
-                items = data['items']
+                items = data['items']  # non-payable structure
             else:
                 # Single item or already the data
                 items = [data] if not isinstance(data, list) else data
@@ -197,12 +260,18 @@ def load_reference_data_to_chromadb(reference_dir: str = "data/reference"):
                 }
 
             elif doc_type == "non_payable":
-                text = f"Non-payable: {item.get('item', '')} Reason: {item.get('reason', '')}"
+                item_name = item.get("item_name", "")
+                status_text = item.get("status_text_raw", "")
+                status = item.get("status", "")
+
+                text = f"{item_name} - Status: {status_text}"
+
                 metadata = {
                     "type": "non_payable",
-                    "item": item.get('item', ''),
-                    "category": item.get('category', ''),
-                    "reason": item.get('reason', '')
+                    "item": item_name,
+                    "status": status,
+                    "status_text": status_text,
+                    "category": "non_payable"
                 }
 
             elif doc_type == "drug_lookup":
@@ -254,7 +323,7 @@ def load_policy_to_chromadb(
     embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
         model_name="all-MiniLM-L6-v2"
     )
-    
+
     # Delete existing collection if exists
     try:
         collection = chroma_client.get_collection(
@@ -265,26 +334,26 @@ def load_policy_to_chromadb(
         chroma_client.delete_collection(name=collection_name)
     except:
         pass
-    
+
     # Create new collection
     collection = chroma_client.create_collection(
         name=collection_name,
         embedding_function=embedding_fn,
         metadata={"description": "User-uploaded insurance policy"}
     )
-    
+
     # Load chunks
     with open(chunks_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
-    
+
     chunks = data['chunks']
     print(f"\nLoading {len(chunks)} policy chunks into ChromaDB...")
-    
+
     # Prepare data
     ids = []
     documents = []
     metadatas = []
-    
+
     for chunk in chunks:
         ids.append(chunk['chunk_id'])
         documents.append(chunk['text'])
@@ -303,14 +372,14 @@ def load_policy_to_chromadb(
                 clean_metadata[key] = value
 
         metadatas.append(clean_metadata)
-    
+
     # Add to collection
     collection.add(
         ids=ids,
         documents=documents,
         metadatas=metadatas
     )
-    
+
     print(f"✅ Loaded {collection.count()} policy chunks into '{collection_name}'")
     return collection
 
@@ -321,6 +390,9 @@ if __name__ == "__main__":
         chunks_path="data/reference/irdai_master_circular_chunks.json"
     )
 
+    # Load policy exclusions
+    policy_collection = load_policy_exclusions()
+
     # Load reference data
     ref_collection = load_reference_data_to_chromadb()
 
@@ -328,5 +400,7 @@ if __name__ == "__main__":
     print("✅ ChromaDB setup complete!")
     print("="*60)
     print(f"IRDAI regulations: {irdai_collection.count()} chunks")
+    if policy_collection:
+        print(f"Policy exclusions: {policy_collection.count()} chunks")
     print(f"Reference benchmarks: {ref_collection.count()} items")
     print(f"Storage location: data/chromadb/")

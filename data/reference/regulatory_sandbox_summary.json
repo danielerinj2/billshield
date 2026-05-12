@@ -1,0 +1,23 @@
+{
+  "document": "IRDAI Regulatory Sandbox Regulations 2025",
+  "source_file": "data/raw/irdai_regulatory_sandbox_2025.pdf",
+  "purpose": "Framework for testing innovative insurance products, services, business models, or processes under regulatory supervision.",
+  "utility_for_billshield": "low_for_mvp_high_for_future",
+  "should_load_into_agent_chromadb": false,
+  "reason_not_loaded_into_agent": "This document is strategic roadmap context. It does not directly define hospital bill overcharge benchmarks or claim rejection rules needed for MVP detection.",
+  "relevance_to_billshield": "Useful for future integrations with insurers, hospitals, or regulated claim-dispute workflows.",
+  "key_points": [
+    "Allows controlled testing of innovative insurance solutions.",
+    "May provide temporary regulatory flexibility during testing.",
+    "Requires consumer protection safeguards.",
+    "Useful for partnerships involving insurers, hospitals, or claim workflows."
+  ],
+  "future_use_cases": [
+    "Direct hospital integration for real-time bill validation before discharge.",
+    "Insurer partnership for automated pre-authorization checks.",
+    "Dispute resolution workflow involving insurer or hospital participation.",
+    "Pilot program requiring IRDAI-supervised sandbox approval."
+  ],
+  "mvp_decision": "Keep as PRD and roadmap context only. Do not use for agent detection logic.",
+  "full_text_excerpt": "रजिस्ट्री स.ं डी.एल.- 33004/99 REGD. No. D. L.-33004/99\nसी.जी.-टी.एल.-अ.-09012025-260081\nxxxGIDHxxx\nCG-TL-E-09012025-260081\nxxxGIDExxx\nअसाधारण\nEXTRAORDINARY\nभाग III—खण् ड 4\nPART III—Section 4\nप्राजधकार स ेप्रकाजित\nPUBLISHED BY AUTHORITY\nस.ं 22] िई कदल्ली, िुक्रिार, िििरी 3, 2025/पौर् 13, 1946\nNo. 22] NEW DELHI, FRIDAY, JANUARY 3, 2025/PAUSHA 13, 1946\nभारतीय बीमा जिजियामक और जिकास प्राजधकरण\nअजधसचू िा\nहदै राबाद, 1 िििरी,2025\nभारतीय बीमा जिजियामक और जिकास प्राजधकरण (जिजियामक सडैं बाक्स) जिजियम, 2025\nफा.स.ं भा.बी.जि.जि.प्रा./जिजियम/5/212/2025– बीमा जिजियामक और जिकास प्राजधकरण अजधजियम, 1999 (1999\nका 41) की धारा 14 की उप-धारा (2) के खंड (ङ) और धारा 26 के साथ पठित बीमा अजधजियम, 1938 (1938 का 4)\nकी धारा 114ए की उप-धारा 2 के खंड (िडे डी) द्वारा प्रदत्त िजियों का प्रयोग करत े हुए, प्राजधकरण बीमा सलाहकार\nसजमजत के साथ परामिश करिे के बाद, इसके द्वारा जिम्नजलजखत जिजियम बिाता ह,ै अथाशत ् :-\nअध्याय I\nप्रारंजभक\n1. सजं िप्त िाम और प्रारंभः\n(1) ये जिजियम भारतीय बीमा जिजियामक और जिकास प्राजधकरण (जिजियामक सैंडबाक्स) जिजियम, 2025\nकहलाएँगे।\n(2) ये जिजियम सरकारी रािपत्र म ेंइिके प्रकािि की तारीख को प्रिृत्त होंगे।\n(3) इि जिजियमों की समीिा आईआरडीएआई (जिजियामक सैंडबाक्स) जिजियम, 2025 के प्रकािि की तारीख से\nप्रत्येक तीि िर् श म े एक बार की िाएगी, िब तक कक इसके पहल े ककसी समीिा, जिरसि अथिा संिोधि की\nआिश्यकता उत्पन्न ि हो।\n2. उद्देश्यः इि जिजियमों के उद्दश्े य जिम्नजलजखत ह ैं :\n100GI/2025\n\n2 THE GAZETTE OF INDIA : EXTRAORDINARY [PART III—SEC.4]\n(1) बीमा िेत्र के सुव्यिजस्ट्थत जिकास और पाजलसीधारकों के जहतों के संरिण को सुजिजित करि े के साथ ही, बीमा\nिेत्र में ििोन्मेर्ण को सुसाध्य बिािा।\n(2) जिजियामक सैंडबाक्स पठरिेि के जिमाशण को सुसाध्य बिािा तथा प्राजधकरण द्वारा बिाये गये ककन्हीं ितशमाि\nजिजियमों के ऐसे उपबंधों को एक सीजमत जिस्ट्तार और सीजमत अिजध के जलए जिजथल करिा/ऐसे उपबंधों से छूट\nदेिा, यकद ऐसा जिजथलि/ऐसी छूट प्रयोग की अिजध के दौराि आिश्यक हो।\n3. पठरभार्ाएँ :\n(1) इि जिजियमों में, िब तक संदभश से अन्यथा अपेजित ि होः-\nक) “अजधजियम” से बीमा अजधजियम, 1938 अजभप्रेत ह;ै\nख) “आिेदक” में जिम्नजलजखत िाजमल"
+}
