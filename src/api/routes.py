@@ -2,8 +2,10 @@
 
 import json
 import os
+import tempfile
 from pathlib import Path
 from typing import List
+
 from fastapi import APIRouter, HTTPException, Depends, File, UploadFile, Form
 from fastapi.responses import JSONResponse
 from supabase import Client
@@ -19,6 +21,9 @@ from src.api.models import (
 from src.agent.core import BillShieldAgent
 from src.rag.retrieval import BillShieldRAG
 from src.letters.generator import AdaptiveLetterGenerator
+from src.scripts.parse_bill_pdf import parse_bill_pdf
+from src.scripts.parse_discharge_pdf import parse_discharge_pdf
+from src.scripts.parse_rejection_pdf import parse_rejection_pdf
 
 router = APIRouter()
 
@@ -114,21 +119,57 @@ async def run_analysis(
         discharge_data = None
         rejection_data = None
         
+        # Create temp directory for downloaded PDFs
+        temp_dir = tempfile.mkdtemp()
+        print(f"Created temp directory: {temp_dir}")
+        
         for doc in docs.data:
-            # Download from storage
-            file_bytes = db.storage.from_('documents').download(doc['file_path'])
-            
-            # TODO: Parse based on doc_type
-            # For now, load from test data
-            if doc['doc_type'] == 'bill':
-                with open('data/uploaded/test_bill_ankit_parsed.json', 'r') as f:
-                    bill_data = json.load(f)
-            elif doc['doc_type'] == 'discharge':
-                with open('data/uploaded/test_discharge_ankit_parsed.json', 'r') as f:
-                    discharge_data = json.load(f)
-            elif doc['doc_type'] == 'rejection':
-                with open('data/uploaded/test_rejection_ankit_parsed.json', 'r') as f:
-                    rejection_data = json.load(f)
+            try:
+                # Download file from Supabase Storage
+                print(f"Downloading {doc['doc_type']}: {doc['file_path']}")
+                file_bytes = db.storage.from_('documents').download(doc['file_path'])
+                
+                # Save to temp file (parsers need file paths)
+                temp_file_path = os.path.join(temp_dir, f"{doc['doc_type']}.pdf")
+                with open(temp_file_path, 'wb') as f:
+                    f.write(file_bytes)
+                
+                print(f"Saved to temp: {temp_file_path}")
+                
+                # Parse based on document type
+                if doc['doc_type'] == 'bill':
+                    print("Parsing bill PDF...")
+                    bill_data = parse_bill_pdf(temp_file_path)
+                    print(f"✓ Bill parsed: {len(bill_data.get('line_items', []))} line items")
+                    
+                elif doc['doc_type'] == 'discharge':
+                    print("Parsing discharge PDF...")
+                    discharge_data = parse_discharge_pdf(temp_file_path)
+                    print("✓ Discharge parsed")
+                    
+                elif doc['doc_type'] == 'rejection':
+                    print("Parsing rejection PDF...")
+                    rejection_data = parse_rejection_pdf(temp_file_path)
+                    print("✓ Rejection parsed")
+                    
+            except Exception as parse_error:
+                print(f"❌ Error parsing {doc['doc_type']}: {str(parse_error)}")
+                import traceback
+                traceback.print_exc()
+                # Continue with other docs even if one fails
+                continue
+        
+        # Verify we got at least the bill
+        if not bill_data:
+            raise HTTPException(
+                status_code=400, 
+                detail="Could not parse hospital bill. Please check the file format."
+            )
+        
+        print("📋 All documents parsed:")
+        print(f"   Bill: {'✓' if bill_data else '✗'}")
+        print(f"   Discharge: {'✓' if discharge_data else '✗'}")
+        print(f"   Rejection: {'✓' if rejection_data else '✗'}")
         
         # Initialize RAG and agent
         rag = BillShieldRAG()
@@ -176,6 +217,7 @@ async def run_analysis(
             "issues_count": len(result.issues),
             "verified_overcharge": result.total_verified_overcharge
         }
+    
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
@@ -190,13 +232,6 @@ async def run_analysis(
             pass
         
         raise HTTPException(status_code=500, detail=f"Failed to run analysis: {str(e)}")
-    except Exception as e:
-        # Update status to failed
-        db.table('analyses').update({
-            'status': 'failed'
-        }).eq('id', analysis_id).execute()
-        
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 
 @router.get("/analysis/{analysis_id}")
