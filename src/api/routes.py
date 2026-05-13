@@ -48,6 +48,9 @@ async def create_analysis(
         }
     
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"ERROR in create_analysis: {error_details}")
         raise HTTPException(status_code=500, detail=f"Failed to create analysis: {str(e)}")
 
 
