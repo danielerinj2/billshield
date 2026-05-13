@@ -5,8 +5,13 @@ __pycache__/
 .env
 data/
 .git/
-node_modules/
+src/
+tests/
+supabase/
 *.db
 *.sqlite
 chromadb_data/
 .chroma/
+requirements.txt
+Procfile
+runtime.txt
