@@ -140,7 +140,17 @@ async def run_analysis(
                 if doc['doc_type'] == 'bill':
                     print("Parsing bill PDF...")
                     bill_data = parse_bill_pdf(temp_file_path)
-                    print(f"✓ Bill parsed: {len(bill_data.get('line_items', []))} line items")
+                    line_count = len(bill_data.get('line_items', []))
+                    
+                    # Fallback to vision LLM if regex parser fails
+                    if line_count == 0:
+                        print("⚠️ Regex returned 0 items, trying vision LLM...")
+                        from src.scripts.vision_llm_parser import parse_pdf_with_vision
+                        bill_data = parse_pdf_with_vision(temp_file_path, doc_type='bill')
+                        line_count = len(bill_data.get('line_items', []))
+                        print(f"✓ Vision parser extracted: {line_count} items")
+                    else:
+                        print(f"✓ Regex extracted: {line_count} items")
                     
                 elif doc['doc_type'] == 'discharge':
                     print("Parsing discharge PDF...")
