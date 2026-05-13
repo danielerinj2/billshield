@@ -1655,55 +1655,6 @@
             document.getElementById(type + 'File').value = '';
         }
 
-        // Form Submissions
-        function handleUpload(event) {
-            event.preventDefault();
-            const patientName = document.getElementById('patientName').value;
-            
-            if (!uploadedFiles.bill) {
-                alert('Please upload your hospital bill');
-                return;
-            }
-
-            // Show analyzing page
-            showPage('analyzing');
-            simulateAnalysis();
-        }
-
-        function simulateAnalysis() {
-            const progressBar = document.getElementById('progressBar');
-            const statusMessage = document.getElementById('statusMessage');
-            
-            const steps = [
-                { progress: 20, message: 'Uploading documents...', delay: 1000 },
-                { progress: 40, message: 'Scanning against CGHS rates...', delay: 2000 },
-                { progress: 60, message: 'Checking NPPA ceilings...', delay: 2000 },
-                { progress: 80, message: 'Detecting IRDAI violations...', delay: 2000 },
-                { progress: 100, message: 'Generating report...', delay: 1500 }
-            ];
-
-            let currentStep = 0;
-
-            function nextStep() {
-                if (currentStep < steps.length) {
-                    const step = steps[currentStep];
-                    progressBar.style.width = step.progress + '%';
-                    statusMessage.textContent = step.message;
-                    currentStep++;
-                    setTimeout(nextStep, step.delay);
-                } else {
-                    setTimeout(() => showPage('results'), 500);
-                }
-            }
-
-            nextStep();
-        }
-
-        function handleLetters(event) {
-            event.preventDefault();
-            // In a real app, this would send the form data to generate letters
-            setTimeout(() => showPage('download'), 1000);
-        }
 
         // Tone Selector
         function selectTone(element, tone) {
@@ -1844,7 +1795,7 @@ async function waitForResults(analysisId, onProgress) {
     while (attempts < maxAttempts) {
         const results = await getResults(analysisId);
         
-        if (results && results.analysis.status === 'complete') {
+        if (results && results.analysis && results.analysis.status === 'complete') {
             return results;
         }
         
@@ -2004,29 +1955,135 @@ function displayResults(results) {
     const analysis = results.analysis;
     const issues = results.issues || [];
 
-    console.log('✅ Displaying real results:', analysis);
+    console.log('📊 REAL Results Received:', analysis);
+    console.log('📋 Issues:', issues);
 
-    // Update financial summary - finds elements by class or ID
-    const summaryCards = document.querySelectorAll('.summary-value');
-    if (summaryCards.length >= 3) {
-        summaryCards[0].textContent = '₹' + (analysis.bill_total || 0).toLocaleString('en-IN');
-        summaryCards[1].textContent = '₹' + (analysis.insurance_approved || 0).toLocaleString('en-IN');
-        summaryCards[2].textContent = '₹' + (analysis.patient_liability || 0).toLocaleString('en-IN');
+    // Step 1: Update the summary numbers at the top
+    const summarySection = document.querySelector('.summary-cards') || document.querySelector('[class*="summary"]');
+    if (summarySection) {
+        const cards = summarySection.querySelectorAll('div');
+        cards.forEach(card => {
+            const label = card.textContent;
+            if (label.includes('Total Bill')) {
+                const valueEl = card.querySelector('h2, h3, div');
+                if (valueEl) valueEl.textContent = '₹' + (analysis.bill_total || 0).toLocaleString('en-IN');
+            }
+            if (label.includes('Insurance Approved')) {
+                const valueEl = card.querySelector('h2, h3, div');
+                if (valueEl) valueEl.textContent = '₹' + (analysis.insurance_approved || 0).toLocaleString('en-IN');
+            }
+            if (label.includes('Your Liability') || label.includes('Liability')) {
+                const valueEl = card.querySelector('h2, h3, div');
+                if (valueEl) valueEl.textContent = '₹' + (analysis.patient_liability || 0).toLocaleString('en-IN');
+            }
+        });
     }
 
-    // Update overcharge amount
-    const overchargeElement = document.querySelector('.overcharge-amount') || document.querySelector('h2');
-    if (overchargeElement) {
-        overchargeElement.textContent = '₹' + (analysis.verified_overcharge || 0).toLocaleString('en-IN');
+    // Step 2: Update the big overcharge number
+    const allElements = document.querySelectorAll('h1, h2, h3, div');
+    allElements.forEach(el => {
+        // Find element showing ₹1,96,144 or similar
+        if (el.textContent.includes('₹1,96,144') || el.textContent.includes('₹196,144')) {
+            el.textContent = '₹' + (analysis.verified_overcharge || 0).toLocaleString('en-IN');
+        }
+        if (el.textContent.includes('Overcharges Found')) {
+            const numEl = el.parentElement.querySelector('h1, h2, div');
+            if (numEl) numEl.textContent = '₹' + (analysis.verified_overcharge || 0).toLocaleString('en-IN');
+        }
+    });
+
+    // Step 3: Update recovery potential
+    const recoveryEl = Array.from(allElements).find(el => el.textContent.includes('Recovery Potential'));
+    if (recoveryEl) {
+        const minPct = Math.round((analysis.min_recoverable / analysis.verified_overcharge) * 100);
+        const maxPct = Math.round((analysis.max_recoverable / analysis.verified_overcharge) * 100);
+        recoveryEl.textContent = `Recovery Potential: ${minPct}-${maxPct}% (₹${(analysis.min_recoverable || 0).toLocaleString('en-IN')}-₹${(analysis.max_recoverable || 0).toLocaleString('en-IN')})`;
     }
 
-    // Show issue count
-    const issueCount = document.querySelector('.issue-count');
-    if (issueCount) {
-        issueCount.textContent = issues.length + ' Issues Found';
+    // Step 4: COMPLETELY REPLACE ISSUE CARDS
+    // Find the issues container
+    const highConfSection = document.querySelector('.high-confidence, [class*="high"]');
+    const medConfSection = document.querySelector('.medium-confidence, [class*="medium"]');
+    
+    // Clear old fake cards
+    if (highConfSection) {
+        const container = highConfSection.querySelector('.issues-list') || highConfSection;
+        container.innerHTML = '';
+        
+        // Add real high confidence issues
+        const highIssues = issues.filter(i => i.confidence === 'high');
+        highIssues.forEach(issue => {
+            const card = document.createElement('div');
+            card.style.cssText = 'border-left: 4px solid #dc2626; padding: 24px; margin-bottom: 20px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);';
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                    <div style="flex: 1;">
+                        <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600; color: #111827;">${issue.description || 'Issue Detected'}</h3>
+                        <span style="display: inline-block; background: #fee2e2; color: #dc2626; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase;">
+                            ${issue.issue_type.replace(/_/g, ' ')}
+                        </span>
+                    </div>
+                    <div style="font-size: 28px; font-weight: 700; color: #dc2626; white-space: nowrap; margin-left: 20px;">
+                        ₹${(issue.overcharge_amount || 0).toLocaleString('en-IN')}
+                    </div>
+                </div>
+                <p style="margin: 16px 0; color: #6b7280; line-height: 1.6;">${issue.action_required || 'Review this charge with your hospital.'}</p>
+                ${issue.evidence && issue.evidence.length > 0 ? `
+                    <button onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'; this.textContent = this.textContent.includes('▼') ? '▲ Hide Evidence' : '▼ View Evidence'" 
+                            style="background: #f3f4f6; border: none; padding: 8px 16px; border-radius: 6px; color: #4b5563; cursor: pointer; font-weight: 500; font-size: 14px;">
+                        ▼ View Evidence
+                    </button>
+                    <div style="display: none; margin-top: 12px; padding: 16px; background: #f9fafb; border-radius: 8px; border-left: 3px solid #6366f1;">
+                        <strong style="color: #374151; display: block; margin-bottom: 8px;">Evidence:</strong>
+                        <div style="color: #6b7280; font-size: 14px; line-height: 1.8;">
+                            ${Array.isArray(issue.evidence) ? issue.evidence.map(ev => `• ${ev}`).join('<br>') : issue.evidence}
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+            container.appendChild(card);
+        });
+        
+        // Update badge
+        const badge = highConfSection.querySelector('[class*="badge"]') || highConfSection.querySelector('span');
+        if (badge && badge.textContent.includes('Issues Found')) {
+            badge.textContent = `${highIssues.length} Issues Found`;
+        }
+    }
+    
+    // Same for medium confidence
+    if (medConfSection) {
+        const container = medConfSection.querySelector('.issues-list') || medConfSection;
+        container.innerHTML = '';
+        
+        const medIssues = issues.filter(i => i.confidence === 'medium');
+        medIssues.forEach(issue => {
+            const card = document.createElement('div');
+            card.style.cssText = 'border-left: 4px solid #f59e0b; padding: 24px; margin-bottom: 20px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);';
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                    <div style="flex: 1;">
+                        <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 600; color: #111827;">${issue.description || 'Issue Detected'}</h3>
+                        <span style="display: inline-block; background: #fef3c7; color: #92400e; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase;">
+                            ${issue.issue_type.replace(/_/g, ' ')}
+                        </span>
+                    </div>
+                    <div style="font-size: 28px; font-weight: 700; color: #f59e0b; white-space: nowrap; margin-left: 20px;">
+                        ₹${(issue.overcharge_amount || 0).toLocaleString('en-IN')}
+                    </div>
+                </div>
+                <p style="margin: 16px 0; color: #6b7280; line-height: 1.6;">${issue.action_required || 'Review this charge with your hospital.'}</p>
+            `;
+            container.appendChild(card);
+        });
+        
+        const badge = medConfSection.querySelector('[class*="badge"]') || medConfSection.querySelector('span');
+        if (badge && badge.textContent.includes('Issues Found')) {
+            badge.textContent = `${medIssues.length} Issues Found`;
+        }
     }
 
-    console.log('✅ Updated page with real data');
+    console.log('✅ PAGE UPDATED WITH REAL DATA!');
 }
 
 console.log('✅ BillShield API Integration Loaded');
