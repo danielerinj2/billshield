@@ -2002,16 +2002,31 @@ function updateProgress(percent) {
 
 function displayResults(results) {
     const analysis = results.analysis;
-    const issues = results.issues;
-    
-    console.log('✅ Analysis Complete!');
-    console.log('Total Bill:', analysis.bill_total);
-    console.log('Overcharges:', analysis.verified_overcharge);
-    console.log('Recoverable:', analysis.min_recoverable, '-', analysis.max_recoverable);
-    console.log('Issues found:', issues.length);
-    
-    // TODO: Update your results page HTML with actual data
-    // For now, check browser console to see the results
+    const issues = results.issues || [];
+
+    console.log('✅ Displaying real results:', analysis);
+
+    // Update financial summary - finds elements by class or ID
+    const summaryCards = document.querySelectorAll('.summary-value');
+    if (summaryCards.length >= 3) {
+        summaryCards[0].textContent = '₹' + (analysis.bill_total || 0).toLocaleString('en-IN');
+        summaryCards[1].textContent = '₹' + (analysis.insurance_approved || 0).toLocaleString('en-IN');
+        summaryCards[2].textContent = '₹' + (analysis.patient_liability || 0).toLocaleString('en-IN');
+    }
+
+    // Update overcharge amount
+    const overchargeElement = document.querySelector('.overcharge-amount') || document.querySelector('h2');
+    if (overchargeElement) {
+        overchargeElement.textContent = '₹' + (analysis.verified_overcharge || 0).toLocaleString('en-IN');
+    }
+
+    // Show issue count
+    const issueCount = document.querySelector('.issue-count');
+    if (issueCount) {
+        issueCount.textContent = issues.length + ' Issues Found';
+    }
+
+    console.log('✅ Updated page with real data');
 }
 
 console.log('✅ BillShield API Integration Loaded');
