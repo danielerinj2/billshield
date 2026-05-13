@@ -1958,63 +1958,40 @@ function displayResults(results) {
     console.log('📊 REAL Results Received:', analysis);
     console.log('📋 Issues:', issues);
 
-    // Step 1: Update the summary numbers at the top
-    const summarySection = document.querySelector('.summary-cards') || document.querySelector('[class*="summary"]');
-    if (summarySection) {
-        const cards = summarySection.querySelectorAll('div');
-        cards.forEach(card => {
-            const label = card.textContent;
-            if (label.includes('Total Bill')) {
-                const valueEl = card.querySelector('h2, h3, div');
-                if (valueEl) valueEl.textContent = '₹' + (analysis.bill_total || 0).toLocaleString('en-IN');
-            }
-            if (label.includes('Insurance Approved')) {
-                const valueEl = card.querySelector('h2, h3, div');
-                if (valueEl) valueEl.textContent = '₹' + (analysis.insurance_approved || 0).toLocaleString('en-IN');
-            }
-            if (label.includes('Your Liability') || label.includes('Liability')) {
-                const valueEl = card.querySelector('h2, h3, div');
-                if (valueEl) valueEl.textContent = '₹' + (analysis.patient_liability || 0).toLocaleString('en-IN');
-            }
-        });
+    // SAFE: Direct selectors, no loops, null checks everywhere
+    
+    // Update summary cards
+    const summaryValues = document.querySelectorAll('.summary-value');
+    if (summaryValues[0]) summaryValues[0].textContent = '₹' + (analysis.bill_total || 0).toLocaleString('en-IN');
+    if (summaryValues[1]) summaryValues[1].textContent = '₹' + (analysis.insurance_approved || 0).toLocaleString('en-IN');
+    if (summaryValues[2]) summaryValues[2].textContent = '₹' + (analysis.patient_liability || 0).toLocaleString('en-IN');
+
+    // Update big overcharge number (direct selector)
+    const overchargeAmount = document.querySelector('.overcharge-amount');
+    if (overchargeAmount) {
+        overchargeAmount.textContent = '₹' + (analysis.verified_overcharge || 0).toLocaleString('en-IN');
     }
 
-    // Step 2: Update the big overcharge number
-    const allElements = document.querySelectorAll('h1, h2, h3, div');
-    allElements.forEach(el => {
-        // Find element showing ₹1,96,144 or similar
-        if (el.textContent.includes('₹1,96,144') || el.textContent.includes('₹196,144')) {
-            el.textContent = '₹' + (analysis.verified_overcharge || 0).toLocaleString('en-IN');
-        }
-        if (el.textContent.includes('Overcharges Found')) {
-            const numEl = el.parentElement.querySelector('h1, h2, div');
-            if (numEl) numEl.textContent = '₹' + (analysis.verified_overcharge || 0).toLocaleString('en-IN');
-        }
-    });
-
-    // Step 3: Update recovery potential
-    const recoveryEl = Array.from(allElements).find(el => el.textContent.includes('Recovery Potential'));
-    if (recoveryEl) {
+    // Update recovery potential (direct selector)
+    const recoveryText = document.querySelector('.recovery-potential');
+    if (recoveryText && analysis.verified_overcharge > 0) {
         const minPct = Math.round((analysis.min_recoverable / analysis.verified_overcharge) * 100);
         const maxPct = Math.round((analysis.max_recoverable / analysis.verified_overcharge) * 100);
-        recoveryEl.textContent = `Recovery Potential: ${minPct}-${maxPct}% (₹${(analysis.min_recoverable || 0).toLocaleString('en-IN')}-₹${(analysis.max_recoverable || 0).toLocaleString('en-IN')})`;
+        recoveryText.textContent = `Recovery Potential: ${minPct}-${maxPct}% (₹${(analysis.min_recoverable || 0).toLocaleString('en-IN')}-₹${(analysis.max_recoverable || 0).toLocaleString('en-IN')})`;
     }
 
-    // Step 4: COMPLETELY REPLACE ISSUE CARDS
-    // Find the issues container
-    const highConfSection = document.querySelector('.high-confidence, [class*="high"]');
-    const medConfSection = document.querySelector('.medium-confidence, [class*="medium"]');
-    
-    // Clear old fake cards
-    if (highConfSection) {
-        const container = highConfSection.querySelector('.issues-list') || highConfSection;
-        container.innerHTML = '';
+    // Clear and rebuild HIGH confidence issues
+    const highContainer = document.querySelector('.high-confidence .issues-list');
+    if (highContainer) {
+        highContainer.innerHTML = '';
         
-        // Add real high confidence issues
         const highIssues = issues.filter(i => i.confidence === 'high');
+        
         highIssues.forEach(issue => {
             const card = document.createElement('div');
+            card.className = 'issue-card';
             card.style.cssText = 'border-left: 4px solid #dc2626; padding: 24px; margin-bottom: 20px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);';
+            
             card.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
                     <div style="flex: 1;">
@@ -2041,25 +2018,29 @@ function displayResults(results) {
                     </div>
                 ` : ''}
             `;
-            container.appendChild(card);
+            
+            highContainer.appendChild(card);
         });
-        
+
         // Update badge
-        const badge = highConfSection.querySelector('[class*="badge"]') || highConfSection.querySelector('span');
-        if (badge && badge.textContent.includes('Issues Found')) {
-            badge.textContent = `${highIssues.length} Issues Found`;
+        const highBadge = document.querySelector('.high-confidence .badge');
+        if (highBadge) {
+            highBadge.textContent = `${highIssues.length} Issues Found`;
         }
     }
-    
-    // Same for medium confidence
-    if (medConfSection) {
-        const container = medConfSection.querySelector('.issues-list') || medConfSection;
-        container.innerHTML = '';
+
+    // Clear and rebuild MEDIUM confidence issues
+    const medContainer = document.querySelector('.medium-confidence .issues-list');
+    if (medContainer) {
+        medContainer.innerHTML = '';
         
         const medIssues = issues.filter(i => i.confidence === 'medium');
+        
         medIssues.forEach(issue => {
             const card = document.createElement('div');
+            card.className = 'issue-card';
             card.style.cssText = 'border-left: 4px solid #f59e0b; padding: 24px; margin-bottom: 20px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);';
+            
             card.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
                     <div style="flex: 1;">
@@ -2074,17 +2055,19 @@ function displayResults(results) {
                 </div>
                 <p style="margin: 16px 0; color: #6b7280; line-height: 1.6;">${issue.action_required || 'Review this charge with your hospital.'}</p>
             `;
-            container.appendChild(card);
+            
+            medContainer.appendChild(card);
         });
-        
-        const badge = medConfSection.querySelector('[class*="badge"]') || medConfSection.querySelector('span');
-        if (badge && badge.textContent.includes('Issues Found')) {
-            badge.textContent = `${medIssues.length} Issues Found`;
+
+        const medBadge = document.querySelector('.medium-confidence .badge');
+        if (medBadge) {
+            medBadge.textContent = `${medIssues.length} Issues Found`;
         }
     }
 
     console.log('✅ PAGE UPDATED WITH REAL DATA!');
 }
+   
 
 console.log('✅ BillShield API Integration Loaded');
 console.log('🔗 Backend URL:', API_URL);
