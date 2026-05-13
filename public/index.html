@@ -1,0 +1,1748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BillShield - Stop Paying More Than You Should on Hospital Bills</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #2563EB;
+            --primary-dark: #1e40af;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --bg: #FAFBFC;
+            --bg-dark: #1E293B;
+            --text: #111827;
+            --text-muted: #6B7280;
+            --border: #E5E7EB;
+            --surface: #FFFFFF;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .page {
+            display: none;
+            opacity: 0;
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        /* Navigation */
+        nav {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: -0.02em;
+        }
+
+        .nav-links a {
+            margin-left: 2rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        /* Hero Section */
+        .hero {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 6rem 2rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .hero-content h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.03em;
+        }
+
+        .hero-content .subheadline {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+
+        .hero-content .supporting {
+            font-size: 1rem;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+            line-height: 1.7;
+        }
+
+        .hero-visual {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
+        }
+
+        .hero-visual::before {
+            content: '';
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 10px,
+                rgba(255, 255, 255, 0.03) 10px,
+                rgba(255, 255, 255, 0.03) 20px
+            );
+            animation: slide 20s linear infinite;
+        }
+
+        @keyframes slide {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        .hero-visual-content {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .bill-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        .bill-item.flagged {
+            background: #FEE2E2;
+            padding: 0.75rem;
+            border-radius: 6px;
+            margin: 0.5rem 0;
+            border: none;
+        }
+
+        .overcharge-badge {
+            background: var(--danger);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-block;
+            padding: 1rem 2rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-large {
+            padding: 1.25rem 3rem;
+            font-size: 1.125rem;
+        }
+
+        /* Sections */
+        .section {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 5rem 2rem;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .section-header h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .section-header p {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+        }
+
+        /* Problem Section */
+        .problems {
+            display: grid;
+            gap: 2rem;
+        }
+
+        .problem-card {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 2.5rem;
+            border-left: 4px solid var(--danger);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .problem-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        .problem-card .issue {
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            line-height: 1.7;
+        }
+
+        .problem-card .example {
+            background: #FEF3C7;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+        }
+
+        /* How It Works */
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+        }
+
+        .step {
+            background: var(--surface);
+            padding: 2rem;
+            border-radius: 12px;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .step-number {
+            position: absolute;
+            top: -20px;
+            left: 2rem;
+            background: var(--primary);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+
+        .step h3 {
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .step p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        /* Flags Grid */
+        .flags-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+        }
+
+        .flag-card {
+            background: var(--surface);
+            padding: 2rem;
+            border-radius: 12px;
+            border-top: 3px solid var(--danger);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .flag-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .flag-card .description {
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        /* FAQ */
+        .faq-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .faq-item {
+            background: var(--surface);
+            margin-bottom: 1rem;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .faq-question {
+            padding: 1.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .faq-question:hover {
+            background: var(--bg);
+        }
+
+        .faq-answer {
+            padding: 0 1.5rem 1.5rem;
+            color: var(--text-muted);
+            line-height: 1.7;
+            display: none;
+        }
+
+        .faq-item.active .faq-answer {
+            display: block;
+        }
+
+        .faq-icon {
+            transition: transform 0.3s;
+        }
+
+        .faq-item.active .faq-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Upload Page */
+        .upload-container {
+            max-width: 800px;
+            margin: 4rem auto;
+            padding: 2rem;
+        }
+
+        .upload-card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 3rem;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+        }
+
+        .form-group {
+            margin-bottom: 2rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+        }
+
+        .form-group input[type="text"] {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .upload-zone {
+            border: 3px dashed var(--border);
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 1rem;
+        }
+
+        .upload-zone:hover {
+            border-color: var(--primary);
+            background: rgba(37, 99, 235, 0.02);
+        }
+
+        .upload-zone.dragover {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.05);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .file-list {
+            margin-top: 1rem;
+        }
+
+        .file-item {
+            background: var(--bg);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-item .name {
+            font-weight: 500;
+        }
+
+        .file-item .size {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .remove-file {
+            color: var(--danger);
+            cursor: pointer;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        .remove-file:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .trust-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 2rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .trust-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Analyzing Page */
+        .analyzing-container {
+            max-width: 700px;
+            margin: 8rem auto;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .progress-container {
+            margin: 3rem 0;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--border);
+            border-radius: 20px;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--success));
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 20px;
+        }
+
+        .status-message {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+            min-height: 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Results Page */
+        .results-container {
+            max-width: 1000px;
+            margin: 3rem auto;
+            padding: 2rem;
+        }
+
+        .financial-summary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            padding: 3rem;
+            color: white;
+            margin-bottom: 3rem;
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .summary-item {
+            text-align: center;
+        }
+
+        .summary-label {
+            font-size: 0.875rem;
+            opacity: 0.9;
+            margin-bottom: 0.5rem;
+        }
+
+        .summary-value {
+            font-size: 2rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .recovery-highlight {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2rem;
+            border-radius: 12px;
+            margin-top: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .issues-section {
+            margin-top: 3rem;
+        }
+
+        .confidence-group {
+            margin-bottom: 2rem;
+        }
+
+        .confidence-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .confidence-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .confidence-badge.high {
+            background: #D1FAE5;
+            color: #065F46;
+        }
+
+        .confidence-badge.medium {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .issue-card {
+            background: var(--surface);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            border-left: 4px solid var(--danger);
+        }
+
+        .issue-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 1rem;
+        }
+
+        .issue-amount {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--danger);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .issue-description {
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+
+        .evidence-toggle {
+            color: var(--primary);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .evidence-content {
+            background: var(--bg);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            display: none;
+        }
+
+        .evidence-content.active {
+            display: block;
+        }
+
+        /* Letters Page */
+        .letters-container {
+            max-width: 900px;
+            margin: 3rem auto;
+            padding: 2rem;
+        }
+
+        .form-section {
+            background: var(--surface);
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .tone-selector {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .tone-option {
+            flex: 1;
+            padding: 1rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .tone-option:hover {
+            border-color: var(--primary);
+        }
+
+        .tone-option.selected {
+            border-color: var(--primary);
+            background: rgba(37, 99, 235, 0.05);
+        }
+
+        .section-toggles {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .toggle-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background: var(--bg);
+            border-radius: 8px;
+        }
+
+        .toggle-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        /* Download Page */
+        .download-container {
+            max-width: 900px;
+            margin: 3rem auto;
+            padding: 2rem;
+        }
+
+        .letter-cards {
+            display: grid;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .letter-card {
+            background: var(--surface);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .letter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .letter-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .download-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .download-btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .download-pdf {
+            background: var(--danger);
+            color: white;
+        }
+
+        .download-word {
+            background: var(--primary);
+            color: white;
+        }
+
+        .preview-btn {
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .next-steps {
+            background: var(--surface);
+            padding: 2rem;
+            border-radius: 12px;
+            border-left: 4px solid var(--success);
+        }
+
+        .timeline {
+            margin-top: 1.5rem;
+        }
+
+        .timeline-item {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: var(--bg);
+            border-radius: 8px;
+        }
+
+        .timeline-number {
+            background: var(--primary);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        /* Footer */
+        footer {
+            background: var(--bg-dark);
+            color: white;
+            padding: 3rem 2rem;
+            margin-top: 5rem;
+        }
+
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 3rem;
+        }
+
+        .footer-section h4 {
+            margin-bottom: 1rem;
+            font-size: 1.125rem;
+        }
+
+        .footer-section a {
+            display: block;
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            margin-bottom: 0.5rem;
+            transition: color 0.2s;
+        }
+
+        .footer-section a:hover {
+            color: white;
+        }
+
+        .disclaimer {
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.5);
+            line-height: 1.6;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero {
+                grid-template-columns: 1fr;
+                padding: 3rem 1rem;
+            }
+
+            .hero-content h1 {
+                font-size: 2.5rem;
+            }
+
+            .section {
+                padding: 3rem 1rem;
+            }
+
+            .section-header h2 {
+                font-size: 2rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .footer-container {
+                grid-template-columns: 1fr;
+            }
+
+            .steps,
+            .flags-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .analyzing-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 2rem;
+            border: 4px solid var(--primary);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <div class="logo">BillShield</div>
+            <div class="nav-links">
+                <a href="#" onclick="showPage('landing'); return false;">Home</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#what-we-flag">What We Flag</a>
+                <a href="#faq">FAQ</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- PAGE 1: LANDING -->
+    <div id="landing" class="page active">
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-content">
+                <h1>Stop Paying More Than You Should on Hospital Bills</h1>
+                <p class="subheadline">We find hidden overcharges in your medical bills and get you refunds—backed by government benchmarks and insurance regulations.</p>
+                <p class="supporting">Hospital billing errors and inflated charges can add ₹50,000-₹2,00,000 to what you actually owe. BillShield scans your bill against CGHS rates, NPPA caps, and insurance regulations, then builds the evidence you need to challenge unfair charges—in under 10 minutes.</p>
+                <button class="btn btn-primary btn-large" onclick="showPage('upload')">Check My Bill Free →</button>
+            </div>
+            <div class="hero-visual">
+                <div class="hero-visual-content">
+                    <div class="bill-item">
+                        <span>Total Bill</span>
+                        <span>₹6,34,179</span>
+                    </div>
+                    <div class="bill-item flagged">
+                        <span>ICU Stay @ ₹22k/day</span>
+                        <span class="overcharge-badge">+₹60,600</span>
+                    </div>
+                    <div class="bill-item flagged">
+                        <span>Drug-Eluting Stent</span>
+                        <span class="overcharge-badge">+₹25,814</span>
+                    </div>
+                    <div class="bill-item flagged">
+                        <span>Multi-procedure billing</span>
+                        <span class="overcharge-badge">+₹47,625</span>
+                    </div>
+                    <div class="bill-item" style="margin-top: 1rem; font-weight: 600; color: var(--success);">
+                        <span>Recoverable</span>
+                        <span>₹1,96,144</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Problem Section -->
+        <section class="section" style="background: white;">
+            <div class="section-header">
+                <h2>Why hospital bills in India are a minefield</h2>
+            </div>
+            <div class="problems">
+                <div class="problem-card">
+                    <h3>Problem 1: No Itemization</h3>
+                    <p class="issue"><strong>The Issue:</strong> Hospitals bundle charges into vague line items like "ICU Consumables ₹85,000" or "Surgical Package ₹1,50,000" with zero breakdown.</p>
+                    <p class="issue"><strong>What You Can't See:</strong> Whether you were charged for supplies you never received, procedures that weren't performed, or equipment that was reused but billed as new.</p>
+                    <p class="issue"><strong>BillShield Finds:</strong> Missing itemization, unexplained bundles, and charges that don't match your discharge summary.</p>
+                </div>
+
+                <div class="problem-card">
+                    <h3>Problem 2: Markup Madness</h3>
+                    <p class="issue"><strong>The Issue:</strong> Medicines sold at 250-400% above Maximum Retail Price. Diagnostic tests charged 8-10x the CGHS benchmark. No justification required.</p>
+                    <div class="example">
+                        <strong>Examples:</strong><br>
+                        • Paracetamol injection (MRP ₹12) billed at ₹65<br>
+                        • CT scan (CGHS rate ₹2,500) billed at ₹19,000
+                    </div>
+                    <p class="issue" style="margin-top: 1rem;"><strong>BillShield Finds:</strong> Every medicine above MRP (which is illegal), every procedure above government benchmarks, every device above NPPA caps.</p>
+                </div>
+
+                <div class="problem-card">
+                    <h3>Problem 3: Insurance Rejection Tricks</h3>
+                    <p class="issue"><strong>The Issue:</strong> Insurers reject valid claims hoping you won't appeal. They cite vague policy clauses, miss their own settlement deadlines, or bury you in paperwork.</p>
+                    <p class="issue"><strong>What They're Banking On:</strong> That you don't know IRDAI made most rejections illegal in 2026. That you won't file complaints. That you'll give up.</p>
+                    <p class="issue"><strong>BillShield Finds:</strong> Regulatory violations, wrongful rejections, and gives you pre-filled IRDAI complaint forms with exact regulation numbers cited.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works -->
+        <section id="how-it-works" class="section">
+            <div class="section-header">
+                <h2>From confused to confident in 10 minutes</h2>
+            </div>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Upload Your Documents</h3>
+                    <p>Hospital bill (PDF or photo), discharge summary, insurance policy (optional), insurance rejection letter (optional). Even blurry phone photos work.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>We Analyze Every Line Item</h3>
+                    <p>Our system cross-references every charge against CGHS rates, NPPA ceiling prices, medicine MRP databases, and your insurance policy terms.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>You Get Evidence-Backed Report</h3>
+                    <p>Summary page with total overcharge estimate, evidence page with line-by-line breakdown, and pre-filled action documents citing specific regulations.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h3>You Challenge the Bill</h3>
+                    <p>Hand the billing manager your report. Point to specific line items. In 68% of cases, hospitals reduce the bill or insurers approve previously rejected claims.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- What We Flag -->
+        <section id="what-we-flag" class="section" style="background: white;">
+            <div class="section-header">
+                <h2>The 6 types of overcharges we fight</h2>
+            </div>
+            <div class="flags-grid">
+                <div class="flag-card">
+                    <h3>1. Duplicate Charges</h3>
+                    <p class="description">Same procedure code appears twice. Consultation fee billed on multiple days when discharge summary shows single visit. Billing software errors or deliberate padding.</p>
+                </div>
+                <div class="flag-card">
+                    <h3>2. Above-MRP Medicine Billing</h3>
+                    <p class="description">Paracetamol billed at ₹45 when MRP is ₹12. Medicines marked up 300-400%. Consumer Protection Act prohibits selling medicines above printed MRP.</p>
+                </div>
+                <div class="flag-card">
+                    <h3>3. Above-Benchmark Procedures</h3>
+                    <p class="description">CT scan charged ₹18,000 vs ₹2,500 CGHS rate. Specialist consultation ₹5,000 vs ₹1,000 CGHS rate. 8-10x markups with no justification.</p>
+                </div>
+                <div class="flag-card">
+                    <h3>4. Phantom Charges</h3>
+                    <p class="description">Bill lists 8 specialist consultations. Discharge summary names 2 specialists. ICU stay billed for 4 days when patient records show 2.</p>
+                </div>
+                <div class="flag-card">
+                    <h3>5. Mysterious Bundled Fees</h3>
+                    <p class="description">"ICU Consumables ₹95,000" with zero breakdown. "Surgical Package ₹2,40,000" with no itemization. You can't verify what you're paying for.</p>
+                </div>
+                <div class="flag-card">
+                    <h3>6. Insurance Regulation Violations</h3>
+                    <p class="description">Claim rejected 28 days after submission (IRDAI rule: must approve/reject within 15 days). Claim rejected for "non-payable item" not in policy exclusions.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ -->
+        <section id="faq" class="section">
+            <div class="section-header">
+                <h2>Common questions</h2>
+            </div>
+            <div class="faq-container">
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFAQ(this)">
+                        <span>What documents can I upload?</span>
+                        <span class="faq-icon">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        Hospital bills (final bill or running bill), discharge summary, insurance policy documents, insurance claim rejection letters, Explanation of Benefits (EOB) from insurer. We accept PDF, JPG, HEIC, PNG formats. Even phone photos work if the text is readable.
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFAQ(this)">
+                        <span>How does BillShield lower my bill?</span>
+                        <span class="faq-icon">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        We don't negotiate directly with hospitals or insurers—we give YOU the evidence to negotiate. Our analysis report identifies specific overcharges, cites government benchmarks and insurance regulations, and provides action documents (objection letters, complaint templates) you can submit immediately.
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFAQ(this)">
+                        <span>Is my information secure?</span>
+                        <span class="faq-icon">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        Yes. We use bank-level encryption (AES-256). We strip personal identifiers before storing bills. Documents are auto-deleted after 30 days unless you opt into anonymized data sharing.
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFAQ(this)">
+                        <span>How long does it take?</span>
+                        <span class="faq-icon">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        Analysis takes 8-15 minutes on average. You'll receive an email and SMS when your report is ready. If you're standing at the billing counter, our summary page prioritizes the top 3 most actionable flags so you can act immediately.
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFAQ(this)">
+                        <span>What if the hospital or insurer ignores my report?</span>
+                        <span class="faq-icon">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        For hospitals: Our escalation path includes requesting itemized breakdowns (required under Consumer Protection Act), filing complaints with State Medical Council. For insurers: Our IRDAI complaint template goes directly to Insurance Ombudsman. Insurers MUST respond to IRDAI complaints within mandated timelines or face penalties.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Final CTA -->
+        <section class="section" style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-top: 0;">
+            <h2 style="font-size: 3rem; margin-bottom: 1rem;">Stop overpaying hospitals</h2>
+            <p style="font-size: 1.25rem; margin-bottom: 2rem; opacity: 0.95;">Upload your bill now. See what you're actually being charged for. Get the evidence to fight back.</p>
+            <button class="btn" style="background: white; color: var(--primary); font-size: 1.125rem; padding: 1.25rem 3rem;" onclick="showPage('upload')">Upload Your Bill Now →</button>
+        </section>
+    </div>
+
+    <!-- PAGE 2: UPLOAD -->
+    <div id="upload" class="page">
+        <div class="upload-container">
+            <div class="upload-card">
+                <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">Upload Your Documents</h1>
+                <p style="color: var(--text-muted); margin-bottom: 3rem; font-size: 1.125rem;">We'll analyze your hospital bill against government benchmarks and insurance regulations in under 10 minutes.</p>
+
+                <form id="uploadForm" onsubmit="handleUpload(event)">
+                    <div class="form-group">
+                        <label>Patient Name *</label>
+                        <input type="text" id="patientName" placeholder="Enter patient name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Hospital Bill (Required) *</label>
+                        <div class="upload-zone" id="billUpload" onclick="document.getElementById('billFile').click()">
+                            <div class="upload-icon">📄</div>
+                            <p><strong>Click to upload</strong> or drag and drop</p>
+                            <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.5rem;">PDF, JPG, PNG accepted (Max 10MB)</p>
+                        </div>
+                        <input type="file" id="billFile" style="display: none" accept=".pdf,.jpg,.jpeg,.png" onchange="handleFileSelect(this, 'bill')">
+                        <div id="billList" class="file-list"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Additional Documents (Optional)</label>
+                        <div style="display: grid; gap: 1rem;">
+                            <div>
+                                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem;">Discharge Summary</p>
+                                <div class="upload-zone" style="padding: 1.5rem;" onclick="document.getElementById('dischargeFile').click()">
+                                    <p>📋 Upload Discharge Summary</p>
+                                </div>
+                                <input type="file" id="dischargeFile" style="display: none" accept=".pdf,.jpg,.jpeg,.png" onchange="handleFileSelect(this, 'discharge')">
+                                <div id="dischargeList" class="file-list"></div>
+                            </div>
+                            <div>
+                                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem;">Insurance Rejection Letter</p>
+                                <div class="upload-zone" style="padding: 1.5rem;" onclick="document.getElementById('rejectionFile').click()">
+                                    <p>✉️ Upload Rejection Letter</p>
+                                </div>
+                                <input type="file" id="rejectionFile" style="display: none" accept=".pdf,.jpg,.jpeg,.png" onchange="handleFileSelect(this, 'rejection')">
+                                <div id="rejectionList" class="file-list"></div>
+                            </div>
+                            <div>
+                                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem;">Insurance Policy Document</p>
+                                <div class="upload-zone" style="padding: 1.5rem;" onclick="document.getElementById('policyFile').click()">
+                                    <p>📑 Upload Policy Document</p>
+                                </div>
+                                <input type="file" id="policyFile" style="display: none" accept=".pdf,.jpg,.jpeg,.png" onchange="handleFileSelect(this, 'policy')">
+                                <div id="policyList" class="file-list"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-large" style="width: 100%;">Analyze My Bill →</button>
+
+                    <div class="trust-indicators">
+                        <div class="trust-item">
+                            <span>✓</span>
+                            <span>Free Analysis</span>
+                        </div>
+                        <div class="trust-item">
+                            <span>⏱</span>
+                            <span>60 Seconds</span>
+                        </div>
+                        <div class="trust-item">
+                            <span>🔒</span>
+                            <span>Encrypted</span>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAGE 3: ANALYZING -->
+    <div id="analyzing" class="page">
+        <div class="analyzing-container">
+            <div class="analyzing-icon"></div>
+            <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">Analyzing Your Bill</h1>
+            <p style="color: var(--text-muted); margin-bottom: 3rem; font-size: 1.125rem;">This typically takes 8-15 minutes. We'll notify you when complete.</p>
+
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressBar"></div>
+                </div>
+                <div class="status-message" id="statusMessage">Uploading documents...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAGE 4: RESULTS -->
+    <div id="results" class="page">
+        <div class="results-container">
+            <div class="financial-summary">
+                <h1 style="font-size: 2.5rem; margin-bottom: 2rem;">Analysis Complete</h1>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <div class="summary-label">Total Bill</div>
+                        <div class="summary-value">₹6,34,179</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">Insurance Approved</div>
+                        <div class="summary-value">₹2,94,000</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">Your Liability</div>
+                        <div class="summary-value">₹3,40,179</div>
+                    </div>
+                </div>
+                <div class="recovery-highlight">
+                    <h2 style="font-size: 1.75rem; margin-bottom: 0.5rem;">✓ Overcharges Found</h2>
+                    <div style="font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem;">₹1,96,144</div>
+                    <p style="font-size: 1.125rem; opacity: 0.95;">Recovery Potential: 58-92% (₹196k-₹312k)</p>
+                </div>
+            </div>
+
+            <div class="issues-section">
+                <div class="confidence-group">
+                    <div class="confidence-header">
+                        <h2 style="font-size: 1.75rem;">High Confidence Issues</h2>
+                        <span class="confidence-badge high">9 Issues Found</span>
+                    </div>
+
+                    <div class="issue-card">
+                        <div class="issue-header">
+                            <div>
+                                <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">ICU Stay - Exceeds CGHS Benchmark</h3>
+                                <span style="background: #FEE2E2; color: #991B1B; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">Procedure Overcharge</span>
+                            </div>
+                            <div class="issue-amount">₹60,600</div>
+                        </div>
+                        <p class="issue-description">ICU Stay - 3 days @ ₹22,000/day exceeds CGHS benchmark of ₹5,400/day. Total charged: ₹66,000. Benchmark: ₹16,200. Overcharge: ₹49,800.</p>
+                        <div class="evidence-toggle" onclick="toggleEvidence(this)">View Evidence ▼</div>
+                        <div class="evidence-content">
+                            <strong>Evidence:</strong><br>
+                            • CGHS rate: ₹5,400/day<br>
+                            • Billed: ₹22,000/day<br>
+                            • Source: CGHS Rate Schedule 2025, Section 8.2<br>
+                            • Markup: 307% above benchmark
+                        </div>
+                    </div>
+
+                    <div class="issue-card">
+                        <div class="issue-header">
+                            <div>
+                                <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Drug-Eluting Stent - Above NPPA Cap</h3>
+                                <span style="background: #FEE2E2; color: #991B1B; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">Device Overcharge</span>
+                            </div>
+                            <div class="issue-amount">₹25,814</div>
+                        </div>
+                        <p class="issue-description">Drug-Eluting Stent charged at ₹85,000. NPPA ceiling price: ₹59,186. Overcharge: ₹25,814.</p>
+                        <div class="evidence-toggle" onclick="toggleEvidence(this)">View Evidence ▼</div>
+                        <div class="evidence-content">
+                            <strong>Evidence:</strong><br>
+                            • NPPA ceiling: ₹59,186<br>
+                            • Billed: ₹85,000<br>
+                            • Source: NPPA Order 2024<br>
+                            • Violation: 44% above mandated ceiling
+                        </div>
+                    </div>
+
+                    <div class="issue-card">
+                        <div class="issue-header">
+                            <div>
+                                <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Multi-Procedure Billing Violation</h3>
+                                <span style="background: #FEE2E2; color: #991B1B; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">IRDAI Violation</span>
+                            </div>
+                            <div class="issue-amount">₹47,625</div>
+                        </div>
+                        <p class="issue-description">Multiple procedures performed during same admission without mandated discounts. IRDAI guidelines require 25% discount on secondary procedures.</p>
+                        <div class="evidence-toggle" onclick="toggleEvidence(this)">View Evidence ▼</div>
+                        <div class="evidence-content">
+                            <strong>Evidence:</strong><br>
+                            • IRDAI Circular: March 2026, Section 4.3<br>
+                            • Required discount: 25% on secondary procedures<br>
+                            • Applied discount: 0%<br>
+                            • Recovery amount: ₹47,625
+                        </div>
+                    </div>
+                </div>
+
+                <div class="confidence-group">
+                    <div class="confidence-header">
+                        <h2 style="font-size: 1.75rem;">Medium Confidence Issues</h2>
+                        <span class="confidence-badge medium">3 Issues Found</span>
+                    </div>
+
+                    <div class="issue-card" style="border-left-color: var(--warning);">
+                        <div class="issue-header">
+                            <div>
+                                <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Bundled "ICU Consumables" - No Itemization</h3>
+                                <span style="background: #FEF3C7; color: #92400E; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">Bundled Charge</span>
+                            </div>
+                            <div class="issue-amount" style="color: var(--warning);">₹67,000</div>
+                        </div>
+                        <p class="issue-description">Line item "ICU Consumables" charged at ₹67,000 with no breakdown. Hospital must provide itemized list under Consumer Protection Act.</p>
+                        <div class="evidence-toggle" onclick="toggleEvidence(this)">View Evidence ▼</div>
+                        <div class="evidence-content">
+                            <strong>Recommended Action:</strong><br>
+                            • Request itemized breakdown from billing department<br>
+                            • Consumer Protection Act requires transparent billing<br>
+                            • Typical consumables: ₹2,000-₹5,000/day for ICU<br>
+                            • This charge: ₹22,333/day (statistical outlier)
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-large" style="width: 100%; margin-top: 2rem;" onclick="showPage('letters')">Generate Dispute Letters →</button>
+
+                <div style="background: var(--bg); padding: 2rem; border-radius: 12px; margin-top: 2rem;">
+                    <h3 style="margin-bottom: 1rem;">What happens next?</h3>
+                    <p style="color: var(--text-muted); line-height: 1.7;">
+                        You'll customize your dispute letters with hospital and insurance details. We'll generate three documents: an objection letter for the hospital billing department, an escalation letter for your insurer, and a patient action plan with timeline and next steps.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAGE 5: LETTERS -->
+    <div id="letters" class="page">
+        <div class="letters-container">
+            <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">Customize Your Letters</h1>
+            <p style="color: var(--text-muted); margin-bottom: 3rem; font-size: 1.125rem;">Fill in the details below to generate personalized dispute letters</p>
+
+            <form id="lettersForm" onsubmit="handleLetters(event)">
+                <div class="form-section">
+                    <h2 style="margin-bottom: 1.5rem;">Hospital & Insurance Details</h2>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Patient Name</label>
+                            <input type="text" value="Ankit Kumar" readonly style="background: var(--bg);">
+                        </div>
+                        <div class="form-group">
+                            <label>Hospital Name *</label>
+                            <input type="text" id="hospitalName" placeholder="e.g. Apollo Hospital" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Bill Number *</label>
+                            <input type="text" id="billNumber" placeholder="e.g. BILL-2024-001" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Insurance Company Name</label>
+                            <input type="text" id="insurerName" placeholder="e.g. Star Health">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Policy Number</label>
+                            <input type="text" id="policyNumber" placeholder="e.g. POL-123">
+                        </div>
+                        <div class="form-group">
+                            <label>Claim Number</label>
+                            <input type="text" id="claimNumber" placeholder="e.g. CLM-456">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h2 style="margin-bottom: 1.5rem;">Letter Tone</h2>
+                    <div class="tone-selector">
+                        <div class="tone-option" onclick="selectTone(this, 'polite')">
+                            <div style="font-weight: 600; margin-bottom: 0.5rem;">Polite</div>
+                            <div style="font-size: 0.9rem; color: var(--text-muted);">Friendly, seeking clarification</div>
+                        </div>
+                        <div class="tone-option selected" onclick="selectTone(this, 'professional')">
+                            <div style="font-weight: 600; margin-bottom: 0.5rem;">Professional</div>
+                            <div style="font-size: 0.9rem; color: var(--text-muted);">Formal, citing regulations</div>
+                        </div>
+                        <div class="tone-option" onclick="selectTone(this, 'firm')">
+                            <div style="font-weight: 600; margin-bottom: 0.5rem;">Firm</div>
+                            <div style="font-size: 0.9rem; color: var(--text-muted);">Direct, escalation ready</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h2 style="margin-bottom: 1.5rem;">Issues to Include</h2>
+                    <div class="section-toggles">
+                        <div class="toggle-item">
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 0.25rem;">Procedure Overcharges</div>
+                                <div style="font-size: 0.9rem; color: var(--text-muted);">ICU Stay, CT Scan - ₹122,000</div>
+                            </div>
+                            <input type="checkbox" checked>
+                        </div>
+                        <div class="toggle-item">
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 0.25rem;">Device Overcharges</div>
+                                <div style="font-size: 0.9rem; color: var(--text-muted);">Drug-Eluting Stent - ₹26,000</div>
+                            </div>
+                            <input type="checkbox" checked>
+                        </div>
+                        <div class="toggle-item" style="opacity: 0.5;">
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 0.25rem;">Drug Overcharges</div>
+                                <div style="font-size: 0.9rem; color: var(--text-muted);">None detected</div>
+                            </div>
+                            <input type="checkbox" disabled>
+                        </div>
+                        <div class="toggle-item">
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 0.25rem;">Multi-Procedure Violations</div>
+                                <div style="font-size: 0.9rem; color: var(--text-muted);">IRDAI Discount Mandate - ₹48,000</div>
+                            </div>
+                            <input type="checkbox" checked>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-large" style="width: 100%;">Generate All Letters →</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- PAGE 6: DOWNLOAD -->
+    <div id="download" class="page">
+        <div class="download-container">
+            <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">Your Letters Are Ready</h1>
+            <p style="color: var(--text-muted); margin-bottom: 3rem; font-size: 1.125rem;">Download and use these documents to challenge your hospital bill</p>
+
+            <div class="letter-cards">
+                <div class="letter-card">
+                    <div class="letter-header">
+                        <div>
+                            <div class="letter-title">Hospital Objection Letter</div>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">Present this to the billing department</p>
+                        </div>
+                        <div class="download-actions">
+                            <button class="download-btn download-pdf" onclick="alert('PDF downloaded!')">📄 PDF</button>
+                            <button class="download-btn download-word" onclick="alert('Word doc downloaded!')">📝 Word</button>
+                            <button class="download-btn preview-btn">👁 Preview</button>
+                        </div>
+                    </div>
+                    <div style="background: var(--bg); padding: 1rem; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
+                        <strong>Preview:</strong> This letter cites specific overcharges (ICU Stay @ ₹60,600, Stent @ ₹25,814) with CGHS and NPPA references, requesting bill reduction of ₹196,144.
+                    </div>
+                </div>
+
+                <div class="letter-card">
+                    <div class="letter-header">
+                        <div>
+                            <div class="letter-title">Insurer Escalation Letter</div>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">Send to insurance grievance cell</p>
+                        </div>
+                        <div class="download-actions">
+                            <button class="download-btn download-pdf" onclick="alert('PDF downloaded!')">📄 PDF</button>
+                            <button class="download-btn download-word" onclick="alert('Word doc downloaded!')">📝 Word</button>
+                            <button class="download-btn preview-btn">👁 Preview</button>
+                        </div>
+                    </div>
+                    <div style="background: var(--bg); padding: 1rem; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
+                        <strong>Preview:</strong> This letter flags multi-procedure billing violations (IRDAI March 2026 guidelines) and requests claim re-evaluation with mandated discounts applied.
+                    </div>
+                </div>
+
+                <div class="letter-card">
+                    <div class="letter-header">
+                        <div>
+                            <div class="letter-title">Patient Action Plan</div>
+                            <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">Your step-by-step guide</p>
+                        </div>
+                        <div class="download-actions">
+                            <button class="download-btn download-pdf" onclick="alert('PDF downloaded!')">📄 PDF</button>
+                            <button class="download-btn download-word" onclick="alert('Word doc downloaded!')">📝 Word</button>
+                            <button class="download-btn preview-btn">👁 Preview</button>
+                        </div>
+                    </div>
+                    <div style="background: var(--bg); padding: 1rem; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
+                        <strong>Preview:</strong> Timeline for submission, expected response times, escalation steps if initial requests are denied, and IRDAI complaint procedures.
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-secondary btn-large" style="width: 100%; margin-bottom: 3rem;" onclick="alert('ZIP file downloaded!')">📦 Download All as ZIP</button>
+
+            <div class="next-steps">
+                <h2 style="margin-bottom: 1rem;">What to do now</h2>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-number">1</div>
+                        <div>
+                            <strong>Within 7 days:</strong> Submit Hospital Objection Letter to billing department. Request meeting to discuss line items. Bring all original documents.
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-number">2</div>
+                        <div>
+                            <strong>Wait 14 days:</strong> Hospital has 14 days to respond. If they agree to reduction, get revised bill in writing before payment.
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-number">3</div>
+                        <div>
+                            <strong>If no response:</strong> Send Insurer Escalation Letter to insurance grievance cell. CC their compliance officer. File IRDAI complaint via Bima Bharosa portal.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-container">
+            <div class="footer-section">
+                <h4 class="logo" style="color: white; margin-bottom: 1rem;">BillShield</h4>
+                <p style="color: rgba(255, 255, 255, 0.7); line-height: 1.6;">
+                    Patient-powered medical bill advocacy. We find the overcharges. You keep the refunds.
+                </p>
+            </div>
+            <div class="footer-section">
+                <h4>Product</h4>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#what-we-flag">What We Flag</a>
+                <a href="#">Sample Report</a>
+                <a href="#" onclick="showPage('upload'); return false;">Upload a Bill</a>
+                <a href="#">Pricing</a>
+            </div>
+            <div class="footer-section">
+                <h4>Legal</h4>
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+                <a href="#">IRDAI Compliance</a>
+                <a href="#">Data Retention</a>
+            </div>
+        </div>
+        <div class="disclaimer">
+            <strong>Disclaimer:</strong> BillShield provides information and analysis tools for medical billing review. We are not a law firm and do not provide legal advice. We are not a healthcare provider and do not provide medical advice. All benchmark data is sourced from publicly available government databases and updated quarterly. Individual results vary based on hospital policies and insurer terms.
+        </div>
+    </footer>
+
+    <script>
+        // Global state
+        let uploadedFiles = {
+            bill: null,
+            discharge: null,
+            rejection: null,
+            policy: null
+        };
+        let selectedTone = 'professional';
+
+        // Page Navigation
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => {
+                p.classList.remove('active');
+            });
+            document.getElementById(pageId).classList.add('active');
+            window.scrollTo(0, 0);
+        }
+
+        // FAQ Toggle
+        function toggleFAQ(element) {
+            const faqItem = element.parentElement;
+            faqItem.classList.toggle('active');
+        }
+
+        // File Upload Handling
+        function handleFileSelect(input, type) {
+            const file = input.files[0];
+            if (file) {
+                uploadedFiles[type] = file;
+                displayFile(file, type);
+            }
+        }
+
+        function displayFile(file, type) {
+            const listId = type + 'List';
+            const list = document.getElementById(listId);
+            list.innerHTML = `
+                <div class="file-item">
+                    <div>
+                        <div class="name">${file.name}</div>
+                        <div class="size">${(file.size / 1024 / 1024).toFixed(2)} MB</div>
+                    </div>
+                    <div class="remove-file" onclick="removeFile('${type}')">Remove</div>
+                </div>
+            `;
+        }
+
+        function removeFile(type) {
+            uploadedFiles[type] = null;
+            document.getElementById(type + 'List').innerHTML = '';
+            document.getElementById(type + 'File').value = '';
+        }
+
+        // Form Submissions
+        function handleUpload(event) {
+            event.preventDefault();
+            const patientName = document.getElementById('patientName').value;
+            
+            if (!uploadedFiles.bill) {
+                alert('Please upload your hospital bill');
+                return;
+            }
+
+            // Show analyzing page
+            showPage('analyzing');
+            simulateAnalysis();
+        }
+
+        function simulateAnalysis() {
+            const progressBar = document.getElementById('progressBar');
+            const statusMessage = document.getElementById('statusMessage');
+            
+            const steps = [
+                { progress: 20, message: 'Uploading documents...', delay: 1000 },
+                { progress: 40, message: 'Scanning against CGHS rates...', delay: 2000 },
+                { progress: 60, message: 'Checking NPPA ceilings...', delay: 2000 },
+                { progress: 80, message: 'Detecting IRDAI violations...', delay: 2000 },
+                { progress: 100, message: 'Generating report...', delay: 1500 }
+            ];
+
+            let currentStep = 0;
+
+            function nextStep() {
+                if (currentStep < steps.length) {
+                    const step = steps[currentStep];
+                    progressBar.style.width = step.progress + '%';
+                    statusMessage.textContent = step.message;
+                    currentStep++;
+                    setTimeout(nextStep, step.delay);
+                } else {
+                    setTimeout(() => showPage('results'), 500);
+                }
+            }
+
+            nextStep();
+        }
+
+        function handleLetters(event) {
+            event.preventDefault();
+            // In a real app, this would send the form data to generate letters
+            setTimeout(() => showPage('download'), 1000);
+        }
+
+        // Tone Selector
+        function selectTone(element, tone) {
+            document.querySelectorAll('.tone-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            element.classList.add('selected');
+            selectedTone = tone;
+        }
+
+        // Evidence Toggle
+        function toggleEvidence(element) {
+            const content = element.nextElementSibling;
+            content.classList.toggle('active');
+            element.textContent = content.classList.contains('active') ? 
+                'Hide Evidence ▲' : 'View Evidence ▼';
+        }
+
+        // Drag and drop for upload zones
+        document.addEventListener('DOMContentLoaded', () => {
+            const uploadZones = document.querySelectorAll('.upload-zone');
+            
+            uploadZones.forEach(zone => {
+                zone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    zone.classList.add('dragover');
+                });
+
+                zone.addEventListener('dragleave', () => {
+                    zone.classList.remove('dragover');
+                });
+
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    zone.classList.remove('dragover');
+                    // Handle file drop
+                });
+            });
+        });
+    </script>
+</body>
+</html>
