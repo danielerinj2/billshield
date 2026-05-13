@@ -1744,5 +1744,271 @@
             });
         });
     </script>
+<script>
+// ==============================================
+// BillShield API Integration
+// ==============================================
+
+const API_URL = 'https://billshield.up.railway.app';
+
+// ==============================================
+// 1. CREATE ANALYSIS
+// ==============================================
+async function createAnalysis(patientName) {
+    try {
+        const response = await fetch(`${API_URL}/api/analysis/create`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                patient_name: patientName
+            })
+        });
+        
+        const data = await response.json();
+        return data.analysis_id;
+    } catch (error) {
+        console.error('Error creating analysis:', error);
+        alert('Failed to create analysis. Please try again.');
+        return null;
+    }
+}
+
+// ==============================================
+// 2. UPLOAD DOCUMENT
+// ==============================================
+async function uploadDocument(analysisId, file, docType) {
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('analysis_id', analysisId);
+        formData.append('doc_type', docType);
+        
+        const response = await fetch(`${API_URL}/api/documents/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        return data.status === 'uploaded';
+    } catch (error) {
+        console.error('Error uploading document:', error);
+        return false;
+    }
+}
+
+// ==============================================
+// 3. RUN ANALYSIS
+// ==============================================
+async function runAnalysis(analysisId) {
+    try {
+        const response = await fetch(`${API_URL}/api/analysis/run/${analysisId}`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        return data.status === 'processing';
+    } catch (error) {
+        console.error('Error running analysis:', error);
+        return false;
+    }
+}
+
+// ==============================================
+// 4. GET RESULTS (Poll every 2 seconds)
+// ==============================================
+async function getResults(analysisId) {
+    try {
+        const response = await fetch(`${API_URL}/api/analysis/${analysisId}`);
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error getting results:', error);
+        return null;
+    }
+}
+
+async function waitForResults(analysisId, onProgress) {
+    let attempts = 0;
+    const maxAttempts = 60; // 2 minutes max
+    
+    while (attempts < maxAttempts) {
+        const results = await getResults(analysisId);
+        
+        if (results && results.analysis.status === 'complete') {
+            return results;
+        }
+        
+        if (results && results.analysis.status === 'failed') {
+            throw new Error('Analysis failed');
+        }
+        
+        // Update progress
+        if (onProgress) {
+            const progress = Math.min((attempts / maxAttempts) * 100, 95);
+            onProgress(progress);
+            document.getElementById('progressBar').style.width = progress + '%';
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        attempts++;
+    }
+    
+    throw new Error('Analysis timeout');
+}
+
+// ==============================================
+// 5. GENERATE LETTERS
+// ==============================================
+async function generateLetters(analysisId, letterData) {
+    try {
+        const response = await fetch(`${API_URL}/api/letters/generate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                analysis_id: analysisId,
+                patient_name: letterData.patientName,
+                hospital_name: letterData.hospitalName,
+                bill_number: letterData.billNumber,
+                insurer_name: letterData.insurerName,
+                policy_number: letterData.policyNumber,
+                claim_number: letterData.claimNumber,
+                tone: letterData.tone || 'professional'
+            })
+        });
+        
+        const data = await response.json();
+        return data.letters;
+    } catch (error) {
+        console.error('Error generating letters:', error);
+        return null;
+    }
+}
+
+// ==============================================
+// 6. OVERRIDE EXISTING FORM HANDLER
+// ==============================================
+
+// Remove the old handleUpload if it exists
+window.handleUpload = async function(event) {
+    event.preventDefault();
+    
+    // Get form values using YOUR IDs
+    const patientName = document.getElementById('patientName').value;
+    const billFile = document.getElementById('billFile').files[0];
+    const dischargeFile = document.getElementById('dischargeFile').files[0];
+    const rejectionFile = document.getElementById('rejectionFile').files[0];
+    const policyFile = document.getElementById('policyFile').files[0];
+    
+    if (!patientName || !billFile) {
+        alert('Please enter patient name and upload bill');
+        return;
+    }
+    
+    try {
+        // Hide upload page, show analyzing page
+        document.getElementById('upload').classList.remove('active');
+        document.getElementById('analyzing').classList.add('active');
+        
+        // Step 1: Create analysis
+        updateStatus('Creating analysis...');
+        const analysisId = await createAnalysis(patientName);
+        if (!analysisId) return;
+        
+        // Step 2: Upload bill
+        updateStatus('Uploading hospital bill...');
+        const billUploaded = await uploadDocument(analysisId, billFile, 'bill');
+        if (!billUploaded) {
+            alert('Failed to upload bill');
+            return;
+        }
+        
+        // Step 3: Upload optional files
+        if (dischargeFile) {
+            updateStatus('Uploading discharge summary...');
+            await uploadDocument(analysisId, dischargeFile, 'discharge');
+        }
+        if (rejectionFile) {
+            updateStatus('Uploading rejection letter...');
+            await uploadDocument(analysisId, rejectionFile, 'rejection');
+        }
+        if (policyFile) {
+            updateStatus('Uploading policy document...');
+            await uploadDocument(analysisId, policyFile, 'policy');
+        }
+        
+        // Step 4: Start analysis
+        updateStatus('Starting AI analysis...');
+        const started = await runAnalysis(analysisId);
+        if (!started) {
+            alert('Failed to start analysis');
+            return;
+        }
+        
+        // Step 5: Wait for results
+        updateStatus('Analyzing against 8,047 benchmarks...');
+        const results = await waitForResults(analysisId, (progress) => {
+            updateProgress(progress);
+        });
+        
+        // Step 6: Show results
+        displayResults(results);
+        
+        // Save analysis ID for letter generation
+        window.currentAnalysisId = analysisId;
+        
+        // Hide analyzing, show results
+        document.getElementById('analyzing').classList.remove('active');
+        document.getElementById('results').classList.add('active');
+        
+    } catch (error) {
+        console.error('Analysis workflow error:', error);
+        alert('Analysis failed: ' + error.message);
+        // Go back to upload page
+        document.getElementById('analyzing').classList.remove('active');
+        document.getElementById('upload').classList.add('active');
+    }
+}
+
+// ==============================================
+// 7. HELPER FUNCTIONS
+// ==============================================
+
+function updateStatus(message) {
+    const statusEl = document.getElementById('statusMessage');
+    if (statusEl) {
+        statusEl.textContent = message;
+    }
+    console.log(message);
+}
+
+function updateProgress(percent) {
+    const progressBar = document.getElementById('progressBar');
+    if (progressBar) {
+        progressBar.style.width = percent + '%';
+    }
+}
+
+function displayResults(results) {
+    const analysis = results.analysis;
+    const issues = results.issues;
+    
+    console.log('✅ Analysis Complete!');
+    console.log('Total Bill:', analysis.bill_total);
+    console.log('Overcharges:', analysis.verified_overcharge);
+    console.log('Recoverable:', analysis.min_recoverable, '-', analysis.max_recoverable);
+    console.log('Issues found:', issues.length);
+    
+    // TODO: Update your results page HTML with actual data
+    // For now, check browser console to see the results
+}
+
+console.log('✅ BillShield API Integration Loaded');
+console.log('🔗 Backend URL:', API_URL);
+
+</script>
 </body>
 </html>
