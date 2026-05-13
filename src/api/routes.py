@@ -133,8 +133,23 @@ def parse_document(temp_file_path: str, doc_type: str, is_image: bool):
             data = parse_bill_pdf(temp_file_path)
             line_count = len(data.get('line_items', []))
             
-            if line_count == 0:
-                print("⚠️ Regex returned 0 items, falling back to vision LLM...")
+            # QUALITY CHECK: Verify we got meaningful data
+            has_amounts = any(
+                item.get('amount', 0) > 0
+                for item in data.get('line_items', [])
+            )
+            has_descriptions = any(
+                item.get('description', '').strip()
+                for item in data.get('line_items', [])
+            )
+            
+            if line_count == 0 or not (has_amounts and has_descriptions):
+                print(
+                    f"⚠️ Regex returned low-quality data "
+                    f"(items={line_count}, has_amounts={has_amounts}, "
+                    f"has_descriptions={has_descriptions})"
+                )
+                print("⚠️ Falling back to vision LLM...")
                 return parse_pdf_with_vision(temp_file_path, doc_type='bill')
             
             print(f"✓ Regex parser extracted {line_count} items")
