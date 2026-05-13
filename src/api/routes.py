@@ -264,6 +264,14 @@ async def run_analysis(
             policy_available=True
         )
         
+        # DEBUG: Log what agent returned
+        print(f"🔍 Agent returned type: {type(result)}")
+        print(f"🔍 Result has issues attr: {hasattr(result, 'issues')}")
+        print(f"🔍 Result.issues type: {type(result.issues) if hasattr(result, 'issues') else 'N/A'}")
+        print(f"🔍 Result.issues length: {len(result.issues) if hasattr(result, 'issues') else 0}")
+        if hasattr(result, 'issues') and len(result.issues) > 0:
+            print(f"🔍 First issue: {result.issues[0]}")
+        
         # Update analysis record
         db.table('analyses').update({
             'status': 'complete',
@@ -277,8 +285,8 @@ async def run_analysis(
             'raw_result': result.to_dict()
         }).eq('id', analysis_id).execute()
         
-        # Insert issues with debug logging
-        print(f"💾 Attempting to save {len(result.issues)} issues to database")
+        # Insert issues with comprehensive debugging
+        print(f"💾 BEFORE INSERT: Agent returned {len(result.issues)} issues")
         
         for idx, issue in enumerate(result.issues):
             try:
@@ -288,8 +296,8 @@ async def run_analysis(
                     'issue_type': issue.issue_type.value if hasattr(issue.issue_type, 'value') else str(issue.issue_type),
                     'description': issue.description,
                     'billed_amount': float(issue.billed_amount) if issue.billed_amount else 0,
-                    'benchmark_amount': float(issue.benchmark_amount) if issue.benchmark_amount else 0,
-                    'overcharge_amount': float(issue.overcharge_amount) if issue.overcharge_amount else 0,
+                    'benchmark_amount': float(issue.benchmark_amount) if issue.benchmark_amount else None,
+                    'overcharge_amount': float(issue.overcharge_amount) if issue.overcharge_amount else None,
                     'confidence': issue.confidence.value if hasattr(issue.confidence, 'value') else str(issue.confidence),
                     'evidence': issue.evidence if isinstance(issue.evidence, list) else [],
                     'action_required': issue.action_required or ''
@@ -299,12 +307,14 @@ async def run_analysis(
                 
                 result_insert = db.table('issues').insert(issue_payload).execute()
                 
-                print(f"✅ Issue {idx+1} inserted: {result_insert.data}")
+                print(f"✅ Issue {idx+1} inserted successfully")
+                print(f"✅ Insert result data: {result_insert.data}")
                 
             except Exception as insert_error:
-                print(f"❌ Failed to insert issue {idx+1}: {insert_error}")
+                print(f"❌ FAILED to insert issue {idx+1}")
+                print(f"❌ Error: {insert_error}")
                 import traceback
-                print(traceback.format_exc())
+                print(f"❌ Traceback: {traceback.format_exc()}")
         
         return {
             "analysis_id": analysis_id,
@@ -342,6 +352,8 @@ async def get_analysis(
             raise HTTPException(status_code=404, detail="Analysis not found")
         
         issues = db.table('issues').select('*').eq('analysis_id', analysis_id).execute()
+        
+        print(f"📤 GET /analysis/{analysis_id} - Returning {len(issues.data)} issues")
         
         return {
             "analysis": result.data,
