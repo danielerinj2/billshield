@@ -277,20 +277,34 @@ async def run_analysis(
             'raw_result': result.to_dict()
         }).eq('id', analysis_id).execute()
         
-        # Insert issues
-        for issue in result.issues:
-            db.table('issues').insert({
-                'analysis_id': analysis_id,
-                'issue_id': issue.issue_id,
-                'issue_type': issue.issue_type.value,
-                'description': issue.description,
-                'billed_amount': issue.billed_amount,
-                'benchmark_amount': issue.benchmark_amount,
-                'overcharge_amount': issue.overcharge_amount,
-                'confidence': issue.confidence.value,
-                'evidence': issue.evidence,
-                'action_required': issue.action_required
-            }).execute()
+        # Insert issues with debug logging
+        print(f"💾 Attempting to save {len(result.issues)} issues to database")
+        
+        for idx, issue in enumerate(result.issues):
+            try:
+                issue_payload = {
+                    'analysis_id': analysis_id,
+                    'issue_id': issue.issue_id,
+                    'issue_type': issue.issue_type.value if hasattr(issue.issue_type, 'value') else str(issue.issue_type),
+                    'description': issue.description,
+                    'billed_amount': float(issue.billed_amount) if issue.billed_amount else 0,
+                    'benchmark_amount': float(issue.benchmark_amount) if issue.benchmark_amount else 0,
+                    'overcharge_amount': float(issue.overcharge_amount) if issue.overcharge_amount else 0,
+                    'confidence': issue.confidence.value if hasattr(issue.confidence, 'value') else str(issue.confidence),
+                    'evidence': issue.evidence if isinstance(issue.evidence, list) else [],
+                    'action_required': issue.action_required or ''
+                }
+                
+                print(f"💾 Issue {idx+1} payload: {issue_payload}")
+                
+                result_insert = db.table('issues').insert(issue_payload).execute()
+                
+                print(f"✅ Issue {idx+1} inserted: {result_insert.data}")
+                
+            except Exception as insert_error:
+                print(f"❌ Failed to insert issue {idx+1}: {insert_error}")
+                import traceback
+                print(traceback.format_exc())
         
         return {
             "analysis_id": analysis_id,
