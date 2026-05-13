@@ -263,21 +263,28 @@ def parse_pdf_with_vision(
     doc_type: str,
     page_num: int = 0,
 ) -> dict[str, Any]:
-    """Parse a PDF using vision-LLM (converts first page to image).
+    """Parse a PDF or image using vision-LLM.
     
     Args:
-        pdf_path: Path to PDF
+        pdf_path: Path to PDF or image file
         doc_type: "bill", "discharge", or "rejection"
-        page_num: Which page to extract (default: first page)
+        page_num: Which page to extract (default: first page, ignored for images)
     
     Returns:
         Structured JSON dict
     """
     from pdf2image import convert_from_path
+    from PIL import Image
     
     pdf_path = Path(pdf_path)
     
-    # Convert first page to image
+    # Check if it's an image file
+    if pdf_path.suffix.lower() in ['.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.webp']:
+        # Read image directly
+        image = Image.open(pdf_path)
+        return parse_with_vision_llm(image, doc_type)
+    
+    # It's a PDF - convert to image
     images = convert_from_path(str(pdf_path), dpi=300, first_page=page_num+1, last_page=page_num+1)
     
     if not images:
