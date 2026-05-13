@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 from typing import List
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, File, UploadFile, Form
 from fastapi.responses import JSONResponse
 from supabase import Client
 
@@ -56,8 +56,8 @@ async def create_analysis(
 
 @router.post("/documents/upload")
 async def upload_document(
-    analysis_id: str,
-    doc_type: str,
+    analysis_id: str = Form(...),
+    doc_type: str = Form(...),
     file: UploadFile = File(...),
     db: Client = Depends(get_db)
 ):
