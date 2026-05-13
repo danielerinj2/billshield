@@ -24,8 +24,23 @@ from src.letters.generator import AdaptiveLetterGenerator
 from src.scripts.parse_bill_pdf import parse_bill_pdf
 from src.scripts.parse_discharge_pdf import parse_discharge_pdf
 from src.scripts.parse_rejection_pdf import parse_rejection_pdf
+from src.scripts.vision_llm_parser import parse_pdf_with_vision
 
 router = APIRouter()
+
+
+# Supported file types
+ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/tiff',
+    'image/bmp',
+    'image/webp'
+]
+
+IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'tiff', 'tif', 'bmp', 'webp']
 
 
 @router.post("/analysis/create")
@@ -35,7 +50,6 @@ async def create_analysis(
 ):
     """Create a new analysis record."""
     try:
-        # Insert into analyses table
         result = db.table('analyses').insert({
             'status': 'processing',
             'patient_name': data.patient_name,
@@ -66,11 +80,14 @@ async def upload_document(
     file: UploadFile = File(...),
     db: Client = Depends(get_db)
 ):
-    """Upload a document to Supabase Storage."""
+    """Upload a document (PDF or image) to Supabase Storage."""
     try:
         # Validate file type
-        if file.content_type not in ['application/pdf', 'image/jpeg', 'image/png']:
-            raise HTTPException(status_code=400, detail="Invalid file type")
+        if file.content_type not in ALLOWED_MIME_TYPES:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid file type. Allowed: PDF, JPG, PNG, TIFF, BMP, WEBP"
+            )
         
         # Read file
         contents = await file.read()
@@ -101,6 +118,64 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
+def parse_document(temp_file_path: str, doc_type: str, is_image: bool):
+    """
+    Parse a document using the appropriate parser.
+    Falls back to vision LLM for images or when regex fails.
+    """
+    if doc_type == 'bill':
+        if is_image:
+            print("📸 Image file - using vision LLM...")
+            return parse_pdf_with_vision(temp_file_path, doc_type='bill')
+        
+        # Try regex parser first for PDFs
+        try:
+            data = parse_bill_pdf(temp_file_path)
+            line_count = len(data.get('line_items', []))
+            
+            if line_count == 0:
+                print("⚠️ Regex returned 0 items, falling back to vision LLM...")
+                return parse_pdf_with_vision(temp_file_path, doc_type='bill')
+            
+            print(f"✓ Regex parser extracted {line_count} items")
+            return data
+        except Exception as e:
+            print(f"⚠️ Regex parser failed: {e}, trying vision LLM...")
+            return parse_pdf_with_vision(temp_file_path, doc_type='bill')
+    
+    elif doc_type == 'discharge':
+        if is_image:
+            print("📸 Image file - using vision LLM...")
+            return parse_pdf_with_vision(temp_file_path, doc_type='discharge')
+        
+        try:
+            data = parse_discharge_pdf(temp_file_path)
+            if not data.get('patient_info', {}).get('name'):
+                print("⚠️ Regex returned empty data, falling back to vision LLM...")
+                return parse_pdf_with_vision(temp_file_path, doc_type='discharge')
+            return data
+        except Exception as e:
+            print(f"⚠️ Regex parser failed: {e}, trying vision LLM...")
+            return parse_pdf_with_vision(temp_file_path, doc_type='discharge')
+    
+    elif doc_type == 'rejection':
+        if is_image:
+            print("📸 Image file - using vision LLM...")
+            return parse_pdf_with_vision(temp_file_path, doc_type='rejection')
+        
+        try:
+            data = parse_rejection_pdf(temp_file_path)
+            if not data.get('claim_metadata', {}).get('claim_number'):
+                print("⚠️ Regex returned empty data, falling back to vision LLM...")
+                return parse_pdf_with_vision(temp_file_path, doc_type='rejection')
+            return data
+        except Exception as e:
+            print(f"⚠️ Regex parser failed: {e}, trying vision LLM...")
+            return parse_pdf_with_vision(temp_file_path, doc_type='rejection')
+    
+    return None
+
+
 @router.post("/analysis/run/{analysis_id}")
 async def run_analysis(
     analysis_id: str,
@@ -114,52 +189,48 @@ async def run_analysis(
         if not docs.data:
             raise HTTPException(status_code=404, detail="No documents found")
         
-        # Download and parse documents
+        # Initialize data containers
         bill_data = None
         discharge_data = None
         rejection_data = None
         
-        # Create temp directory for downloaded PDFs
+        # Create temp directory for downloaded files
         temp_dir = tempfile.mkdtemp()
-        print(f"Created temp directory: {temp_dir}")
+        print(f"📁 Created temp directory: {temp_dir}")
         
         for doc in docs.data:
             try:
                 # Download file from Supabase Storage
-                print(f"Downloading {doc['doc_type']}: {doc['file_path']}")
+                print(f"⬇️ Downloading {doc['doc_type']}: {doc['file_path']}")
                 file_bytes = db.storage.from_('documents').download(doc['file_path'])
                 
-                # Save to temp file (parsers need file paths)
-                temp_file_path = os.path.join(temp_dir, f"{doc['doc_type']}.pdf")
+                # Get original file extension
+                original_filename = doc['file_path'].split('/')[-1]
+                file_extension = original_filename.split('.')[-1].lower()
+                
+                # Save to temp file with CORRECT extension
+                temp_file_path = os.path.join(temp_dir, f"{doc['doc_type']}.{file_extension}")
                 with open(temp_file_path, 'wb') as f:
                     f.write(file_bytes)
                 
-                print(f"Saved to temp: {temp_file_path}")
+                print(f"💾 Saved to temp: {temp_file_path}")
                 
-                # Parse based on document type
+                # Check if it's an image file
+                is_image = file_extension in IMAGE_EXTENSIONS
+                
+                # Parse using the helper function
+                print(f"🔍 Parsing {doc['doc_type']} ({file_extension})...")
+                parsed_data = parse_document(temp_file_path, doc['doc_type'], is_image)
+                
+                # Store parsed data
                 if doc['doc_type'] == 'bill':
-                    print("Parsing bill PDF...")
-                    bill_data = parse_bill_pdf(temp_file_path)
-                    line_count = len(bill_data.get('line_items', []))
-                    
-                    # Fallback to vision LLM if regex parser fails
-                    if line_count == 0:
-                        print("⚠️ Regex returned 0 items, trying vision LLM...")
-                        from src.scripts.vision_llm_parser import parse_pdf_with_vision
-                        bill_data = parse_pdf_with_vision(temp_file_path, doc_type='bill')
-                        line_count = len(bill_data.get('line_items', []))
-                        print(f"✓ Vision parser extracted: {line_count} items")
-                    else:
-                        print(f"✓ Regex extracted: {line_count} items")
-                    
+                    bill_data = parsed_data
+                    print(f"✓ Bill parsed: {len(bill_data.get('line_items', []))} items")
                 elif doc['doc_type'] == 'discharge':
-                    print("Parsing discharge PDF...")
-                    discharge_data = parse_discharge_pdf(temp_file_path)
+                    discharge_data = parsed_data
                     print("✓ Discharge parsed")
-                    
                 elif doc['doc_type'] == 'rejection':
-                    print("Parsing rejection PDF...")
-                    rejection_data = parse_rejection_pdf(temp_file_path)
+                    rejection_data = parsed_data
                     print("✓ Rejection parsed")
                     
             except Exception as parse_error:
@@ -176,7 +247,7 @@ async def run_analysis(
                 detail="Could not parse hospital bill. Please check the file format."
             )
         
-        print("📋 All documents parsed:")
+        print(f"📋 Documents parsed:")
         print(f"   Bill: {'✓' if bill_data else '✗'}")
         print(f"   Discharge: {'✓' if discharge_data else '✗'}")
         print(f"   Rejection: {'✓' if rejection_data else '✗'}")
@@ -251,13 +322,11 @@ async def get_analysis(
 ):
     """Get analysis results."""
     try:
-        # Get analysis
         result = db.table('analyses').select('*').eq('id', analysis_id).single().execute()
         
         if not result.data:
             raise HTTPException(status_code=404, detail="Analysis not found")
         
-        # Get issues
         issues = db.table('issues').select('*').eq('analysis_id', analysis_id).execute()
         
         return {
@@ -276,13 +345,11 @@ async def generate_letters(
 ):
     """Generate all letters for an analysis."""
     try:
-        # Get analysis result
         analysis = db.table('analyses').select('raw_result').eq('id', data.analysis_id).single().execute()
         
         if not analysis.data:
             raise HTTPException(status_code=404, detail="Analysis not found")
         
-        # Generate letters
         generator = AdaptiveLetterGenerator(analysis.data['raw_result'])
         
         letters = []
@@ -296,8 +363,7 @@ async def generate_letters(
                 bill_number=analysis.data['raw_result'].get('bill_number', '[Bill Number]')
             )
             
-            # Save to database
-            result = db.table('letters').insert({
+            db.table('letters').insert({
                 'analysis_id': data.analysis_id,
                 'letter_type': f'hospital_{tone}',
                 'content': content
