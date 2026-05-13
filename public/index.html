@@ -627,6 +627,15 @@
             margin-bottom: 1rem;
         }
 
+        .badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            background: #D1FAE5;
+            color: #065F46;
+        }
+
         .confidence-badge {
             padding: 0.5rem 1rem;
             border-radius: 20px;
@@ -1265,112 +1274,42 @@
                 <div class="summary-grid">
                     <div class="summary-item">
                         <div class="summary-label">Total Bill</div>
-                        <div class="summary-value">₹6,34,179</div>
+                        <div class="summary-value">₹0</div>
                     </div>
                     <div class="summary-item">
                         <div class="summary-label">Insurance Approved</div>
-                        <div class="summary-value">₹2,94,000</div>
+                        <div class="summary-value">₹0</div>
                     </div>
                     <div class="summary-item">
                         <div class="summary-label">Your Liability</div>
-                        <div class="summary-value">₹3,40,179</div>
+                        <div class="summary-value">₹0</div>
                     </div>
                 </div>
                 <div class="recovery-highlight">
                     <h2 style="font-size: 1.75rem; margin-bottom: 0.5rem;">✓ Overcharges Found</h2>
-                    <div style="font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem;">₹1,96,144</div>
-                    <p style="font-size: 1.125rem; opacity: 0.95;">Recovery Potential: 58-92% (₹196k-₹312k)</p>
+                    <div class="overcharge-amount" style="font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem;">₹0</div>
+                    <p class="recovery-potential" style="font-size: 1.125rem; opacity: 0.95;">Checking for issues...</p>
                 </div>
             </div>
 
             <div class="issues-section">
-                <div class="confidence-group">
+                <div class="confidence-group high-confidence">
                     <div class="confidence-header">
                         <h2 style="font-size: 1.75rem;">High Confidence Issues</h2>
-                        <span class="confidence-badge high">9 Issues Found</span>
+                        <span class="badge">0 Issues Found</span>
                     </div>
-
-                    <div class="issue-card">
-                        <div class="issue-header">
-                            <div>
-                                <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">ICU Stay - Exceeds CGHS Benchmark</h3>
-                                <span style="background: #FEE2E2; color: #991B1B; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">Procedure Overcharge</span>
-                            </div>
-                            <div class="issue-amount">₹60,600</div>
-                        </div>
-                        <p class="issue-description">ICU Stay - 3 days @ ₹22,000/day exceeds CGHS benchmark of ₹5,400/day. Total charged: ₹66,000. Benchmark: ₹16,200. Overcharge: ₹49,800.</p>
-                        <div class="evidence-toggle" onclick="toggleEvidence(this)">View Evidence ▼</div>
-                        <div class="evidence-content">
-                            <strong>Evidence:</strong><br>
-                            • CGHS rate: ₹5,400/day<br>
-                            • Billed: ₹22,000/day<br>
-                            • Source: CGHS Rate Schedule 2025, Section 8.2<br>
-                            • Markup: 307% above benchmark
-                        </div>
-                    </div>
-
-                    <div class="issue-card">
-                        <div class="issue-header">
-                            <div>
-                                <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Drug-Eluting Stent - Above NPPA Cap</h3>
-                                <span style="background: #FEE2E2; color: #991B1B; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">Device Overcharge</span>
-                            </div>
-                            <div class="issue-amount">₹25,814</div>
-                        </div>
-                        <p class="issue-description">Drug-Eluting Stent charged at ₹85,000. NPPA ceiling price: ₹59,186. Overcharge: ₹25,814.</p>
-                        <div class="evidence-toggle" onclick="toggleEvidence(this)">View Evidence ▼</div>
-                        <div class="evidence-content">
-                            <strong>Evidence:</strong><br>
-                            • NPPA ceiling: ₹59,186<br>
-                            • Billed: ₹85,000<br>
-                            • Source: NPPA Order 2024<br>
-                            • Violation: 44% above mandated ceiling
-                        </div>
-                    </div>
-
-                    <div class="issue-card">
-                        <div class="issue-header">
-                            <div>
-                                <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Multi-Procedure Billing Violation</h3>
-                                <span style="background: #FEE2E2; color: #991B1B; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">IRDAI Violation</span>
-                            </div>
-                            <div class="issue-amount">₹47,625</div>
-                        </div>
-                        <p class="issue-description">Multiple procedures performed during same admission without mandated discounts. IRDAI guidelines require 25% discount on secondary procedures.</p>
-                        <div class="evidence-toggle" onclick="toggleEvidence(this)">View Evidence ▼</div>
-                        <div class="evidence-content">
-                            <strong>Evidence:</strong><br>
-                            • IRDAI Circular: March 2026, Section 4.3<br>
-                            • Required discount: 25% on secondary procedures<br>
-                            • Applied discount: 0%<br>
-                            • Recovery amount: ₹47,625
-                        </div>
+                    <div class="issues-list">
+                        <!-- Real issues will be inserted here by JavaScript -->
                     </div>
                 </div>
 
-                <div class="confidence-group">
+                <div class="confidence-group medium-confidence">
                     <div class="confidence-header">
                         <h2 style="font-size: 1.75rem;">Medium Confidence Issues</h2>
-                        <span class="confidence-badge medium">3 Issues Found</span>
+                        <span class="badge">0 Issues Found</span>
                     </div>
-
-                    <div class="issue-card" style="border-left-color: var(--warning);">
-                        <div class="issue-header">
-                            <div>
-                                <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">Bundled "ICU Consumables" - No Itemization</h3>
-                                <span style="background: #FEF3C7; color: #92400E; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600;">Bundled Charge</span>
-                            </div>
-                            <div class="issue-amount" style="color: var(--warning);">₹67,000</div>
-                        </div>
-                        <p class="issue-description">Line item "ICU Consumables" charged at ₹67,000 with no breakdown. Hospital must provide itemized list under Consumer Protection Act.</p>
-                        <div class="evidence-toggle" onclick="toggleEvidence(this)">View Evidence ▼</div>
-                        <div class="evidence-content">
-                            <strong>Recommended Action:</strong><br>
-                            • Request itemized breakdown from billing department<br>
-                            • Consumer Protection Act requires transparent billing<br>
-                            • Typical consumables: ₹2,000-₹5,000/day for ICU<br>
-                            • This charge: ₹22,333/day (statistical outlier)
-                        </div>
+                    <div class="issues-list">
+                        <!-- Real issues will be inserted here by JavaScript -->
                     </div>
                 </div>
 
@@ -1445,40 +1384,6 @@
                     </div>
                 </div>
 
-                <div class="form-section">
-                    <h2 style="margin-bottom: 1.5rem;">Issues to Include</h2>
-                    <div class="section-toggles">
-                        <div class="toggle-item">
-                            <div>
-                                <div style="font-weight: 600; margin-bottom: 0.25rem;">Procedure Overcharges</div>
-                                <div style="font-size: 0.9rem; color: var(--text-muted);">ICU Stay, CT Scan - ₹122,000</div>
-                            </div>
-                            <input type="checkbox" checked>
-                        </div>
-                        <div class="toggle-item">
-                            <div>
-                                <div style="font-weight: 600; margin-bottom: 0.25rem;">Device Overcharges</div>
-                                <div style="font-size: 0.9rem; color: var(--text-muted);">Drug-Eluting Stent - ₹26,000</div>
-                            </div>
-                            <input type="checkbox" checked>
-                        </div>
-                        <div class="toggle-item" style="opacity: 0.5;">
-                            <div>
-                                <div style="font-weight: 600; margin-bottom: 0.25rem;">Drug Overcharges</div>
-                                <div style="font-size: 0.9rem; color: var(--text-muted);">None detected</div>
-                            </div>
-                            <input type="checkbox" disabled>
-                        </div>
-                        <div class="toggle-item">
-                            <div>
-                                <div style="font-weight: 600; margin-bottom: 0.25rem;">Multi-Procedure Violations</div>
-                                <div style="font-size: 0.9rem; color: var(--text-muted);">IRDAI Discount Mandate - ₹48,000</div>
-                            </div>
-                            <input type="checkbox" checked>
-                        </div>
-                    </div>
-                </div>
-
                 <button type="submit" class="btn btn-primary btn-large" style="width: 100%;">Generate All Letters →</button>
             </form>
         </div>
@@ -1504,7 +1409,7 @@
                         </div>
                     </div>
                     <div style="background: var(--bg); padding: 1rem; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
-                        <strong>Preview:</strong> This letter cites specific overcharges (ICU Stay @ ₹60,600, Stent @ ₹25,814) with CGHS and NPPA references, requesting bill reduction of ₹196,144.
+                        <strong>Preview:</strong> This letter cites specific overcharges with CGHS and NPPA references, requesting bill reduction.
                     </div>
                 </div>
 
@@ -1521,7 +1426,7 @@
                         </div>
                     </div>
                     <div style="background: var(--bg); padding: 1rem; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;">
-                        <strong>Preview:</strong> This letter flags multi-procedure billing violations (IRDAI March 2026 guidelines) and requests claim re-evaluation with mandated discounts applied.
+                        <strong>Preview:</strong> This letter flags billing violations and requests claim re-evaluation with mandated discounts applied.
                     </div>
                 </div>
 
@@ -1655,7 +1560,6 @@
             document.getElementById(type + 'File').value = '';
         }
 
-
         // Tone Selector
         function selectTone(element, tone) {
             document.querySelectorAll('.tone-option').forEach(opt => {
@@ -1690,7 +1594,6 @@
                 zone.addEventListener('drop', (e) => {
                     e.preventDefault();
                     zone.classList.remove('dragover');
-                    // Handle file drop
                 });
             });
         });
@@ -1702,21 +1605,13 @@
 
 const API_URL = 'https://billshield.up.railway.app';
 
-// ==============================================
-// 1. CREATE ANALYSIS
-// ==============================================
 async function createAnalysis(patientName) {
     try {
         const response = await fetch(`${API_URL}/api/analysis/create`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                patient_name: patientName
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ patient_name: patientName })
         });
-        
         const data = await response.json();
         return data.analysis_id;
     } catch (error) {
@@ -1726,9 +1621,6 @@ async function createAnalysis(patientName) {
     }
 }
 
-// ==============================================
-// 2. UPLOAD DOCUMENT
-// ==============================================
 async function uploadDocument(analysisId, file, docType) {
     try {
         const formData = new FormData();
@@ -1740,7 +1632,6 @@ async function uploadDocument(analysisId, file, docType) {
             method: 'POST',
             body: formData
         });
-        
         const data = await response.json();
         return data.status === 'uploaded';
     } catch (error) {
@@ -1749,24 +1640,17 @@ async function uploadDocument(analysisId, file, docType) {
     }
 }
 
-// ==============================================
-// 3. RUN ANALYSIS
-// ==============================================
 async function runAnalysis(analysisId) {
     try {
         const response = await fetch(`${API_URL}/api/analysis/run/${analysisId}`, {
             method: 'POST'
         });
-        
         if (!response.ok) {
             console.error('Analysis failed with status:', response.status);
             return false;
         }
-        
         const data = await response.json();
         console.log('Analysis response:', data);
-        
-        // Backend returns 'complete' when successful
         return data.status === 'complete' || data.status === 'processing';
     } catch (error) {
         console.error('Error running analysis:', error);
@@ -1774,9 +1658,6 @@ async function runAnalysis(analysisId) {
     }
 }
 
-// ==============================================
-// 4. GET RESULTS (Poll every 2 seconds)
-// ==============================================
 async function getResults(analysisId) {
     try {
         const response = await fetch(`${API_URL}/api/analysis/${analysisId}`);
@@ -1790,7 +1671,7 @@ async function getResults(analysisId) {
 
 async function waitForResults(analysisId, onProgress) {
     let attempts = 0;
-    const maxAttempts = 60; // 2 minutes max
+    const maxAttempts = 60;
     
     while (attempts < maxAttempts) {
         const results = await getResults(analysisId);
@@ -1798,12 +1679,10 @@ async function waitForResults(analysisId, onProgress) {
         if (results && results.analysis && results.analysis.status === 'complete') {
             return results;
         }
-        
         if (results && results.analysis.status === 'failed') {
             throw new Error('Analysis failed');
         }
         
-        // Update progress
         if (onProgress) {
             const progress = Math.min((attempts / maxAttempts) * 100, 95);
             onProgress(progress);
@@ -1813,49 +1692,12 @@ async function waitForResults(analysisId, onProgress) {
         await new Promise(resolve => setTimeout(resolve, 2000));
         attempts++;
     }
-    
     throw new Error('Analysis timeout');
 }
 
-// ==============================================
-// 5. GENERATE LETTERS
-// ==============================================
-async function generateLetters(analysisId, letterData) {
-    try {
-        const response = await fetch(`${API_URL}/api/letters/generate`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                analysis_id: analysisId,
-                patient_name: letterData.patientName,
-                hospital_name: letterData.hospitalName,
-                bill_number: letterData.billNumber,
-                insurer_name: letterData.insurerName,
-                policy_number: letterData.policyNumber,
-                claim_number: letterData.claimNumber,
-                tone: letterData.tone || 'professional'
-            })
-        });
-        
-        const data = await response.json();
-        return data.letters;
-    } catch (error) {
-        console.error('Error generating letters:', error);
-        return null;
-    }
-}
-
-// ==============================================
-// 6. OVERRIDE EXISTING FORM HANDLER
-// ==============================================
-
-// Remove the old handleUpload if it exists
 window.handleUpload = async function(event) {
     event.preventDefault();
     
-    // Get form values using YOUR IDs
     const patientName = document.getElementById('patientName').value;
     const billFile = document.getElementById('billFile').files[0];
     const dischargeFile = document.getElementById('dischargeFile').files[0];
@@ -1868,16 +1710,13 @@ window.handleUpload = async function(event) {
     }
     
     try {
-        // Hide upload page, show analyzing page
         document.getElementById('upload').classList.remove('active');
         document.getElementById('analyzing').classList.add('active');
         
-        // Step 1: Create analysis
         updateStatus('Creating analysis...');
         const analysisId = await createAnalysis(patientName);
         if (!analysisId) return;
         
-        // Step 2: Upload bill
         updateStatus('Uploading hospital bill...');
         const billUploaded = await uploadDocument(analysisId, billFile, 'bill');
         if (!billUploaded) {
@@ -1885,7 +1724,6 @@ window.handleUpload = async function(event) {
             return;
         }
         
-        // Step 3: Upload optional files
         if (dischargeFile) {
             updateStatus('Uploading discharge summary...');
             await uploadDocument(analysisId, dischargeFile, 'discharge');
@@ -1899,7 +1737,6 @@ window.handleUpload = async function(event) {
             await uploadDocument(analysisId, policyFile, 'policy');
         }
         
-        // Step 4: Start analysis
         updateStatus('Starting AI analysis...');
         const started = await runAnalysis(analysisId);
         if (!started) {
@@ -1907,72 +1744,53 @@ window.handleUpload = async function(event) {
             return;
         }
         
-        // Step 5: Wait for results
         updateStatus('Analyzing against 8,047 benchmarks...');
         const results = await waitForResults(analysisId, (progress) => {
             updateProgress(progress);
         });
         
-        // Step 6: Show results
         displayResults(results);
-        
-        // Save analysis ID for letter generation
         window.currentAnalysisId = analysisId;
         
-        // Hide analyzing, show results
         document.getElementById('analyzing').classList.remove('active');
         document.getElementById('results').classList.add('active');
         
     } catch (error) {
         console.error('Analysis workflow error:', error);
         alert('Analysis failed: ' + error.message);
-        // Go back to upload page
         document.getElementById('analyzing').classList.remove('active');
         document.getElementById('upload').classList.add('active');
     }
 }
 
-// ==============================================
-// 7. HELPER FUNCTIONS
-// ==============================================
-
 function updateStatus(message) {
     const statusEl = document.getElementById('statusMessage');
-    if (statusEl) {
-        statusEl.textContent = message;
-    }
+    if (statusEl) statusEl.textContent = message;
     console.log(message);
 }
 
 function updateProgress(percent) {
     const progressBar = document.getElementById('progressBar');
-    if (progressBar) {
-        progressBar.style.width = percent + '%';
-    }
+    if (progressBar) progressBar.style.width = percent + '%';
 }
 
 function displayResults(results) {
     const analysis = results.analysis;
     const issues = results.issues || [];
 
-    console.log('📊 REAL Results Received:', analysis);
-    console.log('📋 Issues:', issues);
+    console.log('📊 REAL API Response:', analysis);
+    console.log('📋 Issues Array:', issues);
 
-    // SAFE: Direct selectors, no loops, null checks everywhere
-    
-    // Update summary cards
     const summaryValues = document.querySelectorAll('.summary-value');
     if (summaryValues[0]) summaryValues[0].textContent = '₹' + (analysis.bill_total || 0).toLocaleString('en-IN');
     if (summaryValues[1]) summaryValues[1].textContent = '₹' + (analysis.insurance_approved || 0).toLocaleString('en-IN');
     if (summaryValues[2]) summaryValues[2].textContent = '₹' + (analysis.patient_liability || 0).toLocaleString('en-IN');
 
-    // Update big overcharge number (direct selector)
     const overchargeAmount = document.querySelector('.overcharge-amount');
     if (overchargeAmount) {
         overchargeAmount.textContent = '₹' + (analysis.verified_overcharge || 0).toLocaleString('en-IN');
     }
 
-    // Update recovery potential (direct selector)
     const recoveryText = document.querySelector('.recovery-potential');
     if (recoveryText && analysis.verified_overcharge > 0) {
         const minPct = Math.round((analysis.min_recoverable / analysis.verified_overcharge) * 100);
@@ -1980,11 +1798,9 @@ function displayResults(results) {
         recoveryText.textContent = `Recovery Potential: ${minPct}-${maxPct}% (₹${(analysis.min_recoverable || 0).toLocaleString('en-IN')}-₹${(analysis.max_recoverable || 0).toLocaleString('en-IN')})`;
     }
 
-    // Clear and rebuild HIGH confidence issues
     const highContainer = document.querySelector('.high-confidence .issues-list');
     if (highContainer) {
         highContainer.innerHTML = '';
-        
         const highIssues = issues.filter(i => i.confidence === 'high');
         
         highIssues.forEach(issue => {
@@ -2018,22 +1834,16 @@ function displayResults(results) {
                     </div>
                 ` : ''}
             `;
-            
             highContainer.appendChild(card);
         });
 
-        // Update badge
         const highBadge = document.querySelector('.high-confidence .badge');
-        if (highBadge) {
-            highBadge.textContent = `${highIssues.length} Issues Found`;
-        }
+        if (highBadge) highBadge.textContent = `${highIssues.length} Issues Found`;
     }
 
-    // Clear and rebuild MEDIUM confidence issues
     const medContainer = document.querySelector('.medium-confidence .issues-list');
     if (medContainer) {
         medContainer.innerHTML = '';
-        
         const medIssues = issues.filter(i => i.confidence === 'medium');
         
         medIssues.forEach(issue => {
@@ -2055,23 +1865,18 @@ function displayResults(results) {
                 </div>
                 <p style="margin: 16px 0; color: #6b7280; line-height: 1.6;">${issue.action_required || 'Review this charge with your hospital.'}</p>
             `;
-            
             medContainer.appendChild(card);
         });
 
         const medBadge = document.querySelector('.medium-confidence .badge');
-        if (medBadge) {
-            medBadge.textContent = `${medIssues.length} Issues Found`;
-        }
+        if (medBadge) medBadge.textContent = `${medIssues.length} Issues Found`;
     }
 
-    console.log('✅ PAGE UPDATED WITH REAL DATA!');
+    console.log('✅ PAGE UPDATED');
 }
-   
 
 console.log('✅ BillShield API Integration Loaded');
 console.log('🔗 Backend URL:', API_URL);
-
 </script>
 </body>
 </html>
