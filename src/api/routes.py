@@ -176,7 +176,20 @@ async def run_analysis(
             "issues_count": len(result.issues),
             "verified_overcharge": result.total_verified_overcharge
         }
-    
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"ERROR in run_analysis: {error_details}")
+        
+        # Update analysis to failed status
+        try:
+            db.table('analyses').update({
+                'status': 'failed'
+            }).eq('id', analysis_id).execute()
+        except:
+            pass
+        
+        raise HTTPException(status_code=500, detail=f"Failed to run analysis: {str(e)}")
     except Exception as e:
         # Update status to failed
         db.table('analyses').update({
