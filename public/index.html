@@ -1807,8 +1807,16 @@ async function runAnalysis(analysisId) {
             method: 'POST'
         });
         
+        if (!response.ok) {
+            console.error('Analysis failed with status:', response.status);
+            return false;
+        }
+        
         const data = await response.json();
-        return data.status === 'processing';
+        console.log('Analysis response:', data);
+        
+        // Backend returns 'complete' when successful
+        return data.status === 'complete' || data.status === 'processing';
     } catch (error) {
         console.error('Error running analysis:', error);
         return false;
