@@ -127,6 +127,29 @@ class BillShieldAgent:
         print("BillShield Agent Starting Analysis")
         print(f"{'=' * 70}\n")
 
+        # ========== PHASE 1: DOCUMENT ROUTING ==========
+        # Classify document type and route to specialist analyzer
+        from src.agent.document_classifier import classify_document, DocumentType
+
+        doc_type = classify_document(bill_data)
+        print(f"📋 Document classified as: {doc_type}\n")
+
+        if doc_type == DocumentType.PHARMACY_BILL:
+            print("🔀 Routing to Pharmacy Analyzer...")
+            from src.agent.pharmacy_analyzer import PharmacyAnalyzer
+
+            analyzer = PharmacyAnalyzer(rag_system=self.rag)
+            return analyzer.analyze(bill_data)
+
+        elif doc_type == DocumentType.UNKNOWN:
+            print("⚠️  Document type unclear - using hospital bill analyzer as fallback\n")
+
+        else:
+            print(f"✓ Using Hospital Bill Analyzer for {doc_type}\n")
+
+        # ========== PHASE 1 ROUTING ENDS ==========
+        # For HOSPITAL_BILL and UNKNOWN, continue with existing hospital bill logic below
+
         issues = []
 
         # Detect episodes (surgical packages, room stays) first
@@ -150,6 +173,7 @@ class BillShieldAgent:
             print(f"\n🔧 Found {len(unmatched_items)} unmatched items, calling Universal Agent...")
             try:
                 from src.agent.universal_agent import UniversalAgent
+
                 universal_agent = UniversalAgent(rag_system=self.rag)
                 universal_issues = universal_agent.analyze_unmatched_items(
                     unmatched_items=unmatched_items,
@@ -162,7 +186,9 @@ class BillShieldAgent:
                         issues.append(
                             BillingIssue(
                                 issue_id=univ_issue["issue_id"],
-                                issue_type=IssueType(univ_issue.get("issue_type", "procedure_overcharge")),
+                                issue_type=IssueType(
+                                    univ_issue.get("issue_type", "procedure_overcharge")
+                                ),
                                 description=univ_issue["description"],
                                 billed_amount=univ_issue["billed_amount"],
                                 benchmark_amount=univ_issue.get("benchmark_amount"),
@@ -175,12 +201,14 @@ class BillShieldAgent:
                     except Exception as e:
                         print(f"⚠️ Failed to convert universal issue: {e}")
                         continue
+
             except Exception as universal_error:
                 print(f"⚠️ Universal Agent failed: {universal_error}")
 
         if discharge_data:
             print("📄 Cross-referencing discharge summary...")
             issues.extend(self._cross_reference_discharge(bill_data, discharge_data))
+
             print("🔧 Checking multi-procedure billing discounts...")
             issues.extend(self._check_multi_procedure_billing(bill_data, discharge_data))
 

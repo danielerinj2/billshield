@@ -10,6 +10,39 @@ import importlib
 from pathlib import Path
 
 
+def _extract_and_repair_json(text: str) -> dict:
+    """
+    Extract JSON from LLM response that may contain markdown or prose.
+    Handles common malformations from vision models.
+    """
+    # Remove markdown code fences
+    if "```json" in text:
+        text = text.split("```json")[1].split("```")[0]
+    elif "```" in text:
+        text = text.split("```")[1].split("```")[0]
+
+    # Remove leading prose
+    text = text.strip()
+
+    # Find first { and last }
+    start = text.find("{")
+    end = text.rfind("}")
+
+    if start == -1 or end == -1:
+        raise ValueError("No JSON object found in response")
+
+    json_text = text[start:end + 1]
+
+    # Attempt to parse
+    try:
+        return json.loads(json_text)
+    except json.JSONDecodeError as e:
+        # Log the error but raise for tier 3 fallback
+        print(f"⚠️ JSON parse error: {e}")
+        print(f"📄 Attempted to parse: {json_text[:200]}...")
+        raise
+
+
 def parse_with_groq_vision(image_path: str, doc_type: str = 'bill') -> dict:
     """
     Parse a hospital bill using Groq's vision model as final fallback.
@@ -208,14 +241,11 @@ CRITICAL RULES:
 
         result_text = response.choices[0].message.content.strip()
 
-        # Clean markdown if present
-        if result_text.startswith('```json'):
-            result_text = result_text.replace('```json', '').replace('```', '').strip()
-        elif result_text.startswith('```'):
-            result_text = result_text.replace('```', '').strip()
-
-        # Parse JSON
-        parsed_data = json.loads(result_text)
+        try:
+            parsed_data = _extract_and_repair_json(result_text)
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"⚠️ TIER 2 JSON extraction failed: {e}")
+            raise Exception(f"LLM returned invalid JSON: {e}")
 
         print(f"✅ Groq vision parsed {len(parsed_data.get('line_items', []))} items")
         return parsed_data
