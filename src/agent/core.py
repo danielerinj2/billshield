@@ -182,6 +182,7 @@ class BillShieldAgent:
         print("🧮 Calculating totals and confidence scores...\n")
 
         issues = self._deduplicate_issues(issues)
+        issues = self._group_surgical_packages(issues)
 
         result = self._generate_result(bill_data, rejection_data, issues)
 
@@ -423,7 +424,29 @@ class BillShieldAgent:
 
         benchmark = self._match_to_benchmark(item, bill_data)
         if not benchmark:
-            return None
+            # No benchmark found at all - still flag as needing itemization
+            self.issue_counter += 1
+            return BillingIssue(
+                issue_id=f"REVIEW_{self.issue_counter:03d}",
+                issue_type=IssueType.MISSING_ITEMIZATION,
+                description=f"{description} — needs procedure identification",
+                billed_amount=amount,
+                benchmark_amount=None,
+                overcharge_amount=None,
+                confidence=Confidence.LOW,
+                evidence=[
+                    f"Billed amount: ₹{amount:,.2f}",
+                    "No reliable benchmark match found for this charge",
+                    "Cannot verify pricing without exact procedure name and code",
+                ],
+                action_required=(
+                    "Request itemization and procedure code from hospital. "
+                    "Ask: what exact procedure was performed and what is its tariff entry?"
+                ),
+                benchmark_type="CGHS",
+                match_quality=0.0,
+                matched_procedure=None,
+            )
 
         cghs_rate = benchmark.get("rate", 0)
         similarity = benchmark.get("similarity", 0)
@@ -432,6 +455,7 @@ class BillShieldAgent:
         if not cghs_rate:
             return None
 
+        # Determine confidence tier based on match quality
         if similarity >= 0.75:
             confidence = Confidence.HIGH
             amount_threshold = 1.5
@@ -439,31 +463,34 @@ class BillShieldAgent:
             confidence = Confidence.MEDIUM
             amount_threshold = 2.0
         else:
+            # LOW CONFIDENCE: Clean, patient-friendly evidence
+            # Do NOT show confusing CGHS benchmark details
             self.issue_counter += 1
             return BillingIssue(
                 issue_id=f"REVIEW_{self.issue_counter:03d}",
                 issue_type=IssueType.MISSING_ITEMIZATION,
-                description=f"{description} — unable to verify against CGHS benchmark",
+                description=f"{description} — needs procedure identification",
                 billed_amount=amount,
                 benchmark_amount=None,
                 overcharge_amount=None,
                 confidence=Confidence.LOW,
                 evidence=[
                     f"Billed amount: ₹{amount:,.2f}",
-                    f"Closest CGHS entry found: '{matched_procedure}' at ₹{cghs_rate:,.2f}",
-                    f"Match similarity: {similarity:.0%} (LOW — likely a different test/procedure)",
-                    "⚠️ Shown for reference only — this is a different procedure, not a benchmark for your bill",
-                    "Cannot confirm overcharge without exact procedure identification",
+                    "No reliable CGHS match found for this charge",
+                    "Cannot verify pricing without exact procedure name and code from hospital",
                 ],
                 action_required=(
-                    "Request detailed itemization and procedure code from hospital. "
-                    "Cannot confirm overcharge without this information."
+                    "Before paying, ask the hospital: "
+                    "(1) What exact procedure does this charge cover? "
+                    "(2) What is the procedure code or tariff card entry? "
+                    "(3) Is this a standalone charge or part of a package?"
                 ),
                 benchmark_type="CGHS",
                 match_quality=similarity,
-                matched_procedure=matched_procedure,
+                matched_procedure=None,  # Intentionally hidden from LOW confidence cards
             )
 
+        # HIGH or MEDIUM: Check if amount significantly exceeds benchmark
         if amount <= cghs_rate * amount_threshold:
             return None
 
@@ -478,7 +505,7 @@ class BillShieldAgent:
                 "Request hospital to justify charge or revise it with reference to CGHS rate. "
                 "Ask for procedure code and tariff card entry."
             )
-        else:
+        else:  # MEDIUM
             issue_description = (
                 f"{description} may be above CGHS benchmark — verify test/procedure identity"
             )
@@ -1079,6 +1106,61 @@ class BillShieldAgent:
 
         print(f"📊 Deduplication: {len(issues)} → {len(deduplicated)} issues")
         return deduplicated
+
+    def _group_surgical_packages(self, issues: List[BillingIssue]) -> List[BillingIssue]:
+        """
+        Group related LOW-confidence surgical charges into package cards.
+        Reduces 5 separate OT/anesthesia/assistant cards into 1 "surgical package" card.
+        """
+        # Separate LOW confidence surgery-related issues from others
+        surgery_keywords = ['operation', 'ot ', 'anesthetic', 'anaesthetic', 'assistant', 'dressing']
+        
+        low_surgery = []
+        other_issues = []
+        
+        for issue in issues:
+            if issue.confidence == Confidence.LOW:
+                desc_lower = issue.description.lower()
+                if any(kw in desc_lower for kw in surgery_keywords):
+                    low_surgery.append(issue)
+                else:
+                    other_issues.append(issue)
+            else:
+                other_issues.append(issue)
+        
+        # If we have multiple LOW-confidence surgery charges, group them
+        if len(low_surgery) >= 3:
+            total_amount = sum(i.billed_amount for i in low_surgery)
+            descriptions = [i.description.split(' — ')[0] for i in low_surgery]  # Remove " — needs procedure identification"
+            
+            grouped = BillingIssue(
+                issue_id="PKG_001",
+                issue_type=IssueType.MISSING_ITEMIZATION,
+                description="Surgery package charges need procedure identification",
+                billed_amount=total_amount,
+                benchmark_amount=None,
+                overcharge_amount=None,
+                confidence=Confidence.LOW,
+                evidence=[
+                    f"Total surgery-related charges: ₹{total_amount:,.2f}",
+                    "Components: " + ", ".join(descriptions),
+                    "This appears to be a surgical package but the exact procedure is not specified on the bill",
+                    "Without the procedure name, we cannot verify against CGHS surgical packages",
+                ],
+                action_required=(
+                    "Before paying, ask the hospital: (1) What exact surgical procedure was performed? "
+                    "(2) What is the package code and tariff rate? "
+                    "(3) Are anesthesia, OT, and assistant fees included in the package or separate?"
+                ),
+                benchmark_type="CGHS",
+                match_quality=0.0,
+                matched_procedure=None,
+            )
+            
+            print(f"📦 Grouped {len(low_surgery)} LOW-confidence surgery charges into 1 package card")
+            return other_issues + [grouped]
+        
+        return issues
 
     def _generate_result(
         self,
