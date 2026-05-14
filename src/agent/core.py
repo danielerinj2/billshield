@@ -46,6 +46,9 @@ class BillingIssue:
     confidence: Confidence
     evidence: List[str]
     action_required: str
+    benchmark_type: str = "CGHS"
+    match_quality: float = 0.0
+    matched_procedure: str | None = None
 
     def to_dict(self):
         """Convert to dictionary for JSON serialization."""
@@ -177,6 +180,8 @@ class BillShieldAgent:
 
         print(f"\n✅ Found {len(issues)} potential issues")
         print("🧮 Calculating totals and confidence scores...\n")
+
+        issues = self._deduplicate_issues(issues)
 
         result = self._generate_result(bill_data, rejection_data, issues)
 
@@ -310,13 +315,7 @@ class BillShieldAgent:
 
     def _match_to_benchmark(self, line_item: Dict, bill_data: Dict) -> Dict | None:
         """
-        Match a line item to a CGHS benchmark using priority order.
-
-        Priority 1: procedure code
-        Priority 2: bill-level procedure name
-        Priority 3: line item description
-        Priority 4: web search fallback placeholder
-        Priority 5: manual review / no benchmark
+        Match a line item to a CGHS benchmark using improved priority order.
         """
         if not self.rag:
             return None
@@ -325,24 +324,35 @@ class BillShieldAgent:
         if procedure_codes:
             benchmark = self._search_by_code(procedure_codes)
             if benchmark:
+                print(f"✅ Matched by code: {procedure_codes}")
                 return benchmark
 
         procedure_name = bill_data.get("procedure_name")
         if procedure_name:
+            print(f"🔎 Searching CGHS for procedure: {procedure_name}")
             benchmark = self._fuzzy_search_cghs(procedure_name)
             if benchmark:
+                print(f"✅ Matched by procedure name: {benchmark.get('procedure')}")
                 return benchmark
 
         description = line_item.get("description", "")
-        if description:
-            benchmark = self._fuzzy_search_cghs(description)
+        if procedure_name and description:
+            clean_desc = description.replace(bill_data.get("department", ""), "").replace("-", "").strip()
+            combined_query = f"{procedure_name} {clean_desc}"
+            print(f"🔎 Searching CGHS for combined: {combined_query}")
+            benchmark = self._fuzzy_search_cghs(combined_query)
             if benchmark:
+                print(f"✅ Matched by combined: {benchmark.get('procedure')}")
                 return benchmark
 
-        benchmark = self._web_search_cghs_rate(description)
-        if benchmark:
-            return benchmark
+        if description:
+            print(f"🔎 Searching CGHS for description: {description}")
+            benchmark = self._fuzzy_search_cghs(description)
+            if benchmark:
+                print(f"✅ Matched by description: {benchmark.get('procedure')}")
+                return benchmark
 
+        print(f"❌ No CGHS match found for: {description}")
         return None
 
     def _search_by_code(self, procedure_codes: List[str]) -> Dict | None:
@@ -366,7 +376,7 @@ class BillShieldAgent:
         return None
 
     def _fuzzy_search_cghs(self, query: str) -> Dict | None:
-        """Search CGHS benchmarks using semantic/fuzzy text matching."""
+        """Search CGHS benchmarks with similarity score."""
         if not self.rag or not query:
             return None
 
@@ -398,7 +408,13 @@ class BillShieldAgent:
         benchmark_label: str,
         action_required: str,
     ) -> BillingIssue | None:
-        """Generic CGHS benchmark overcharge checker."""
+        """
+        Confidence-weighted CGHS benchmark checker.
+
+        HIGH (similarity >= 0.75): Clear match, claim overcharge with strong wording.
+        MEDIUM (similarity 0.55-0.75): Possible match, request verification.
+        LOW (similarity < 0.55): Different test/procedure, request itemization only.
+        """
         if not self.rag:
             return None
 
@@ -410,37 +426,88 @@ class BillShieldAgent:
             return None
 
         cghs_rate = benchmark.get("rate", 0)
+        similarity = benchmark.get("similarity", 0)
+        matched_procedure = benchmark.get("procedure", "Unknown")
+
         if not cghs_rate:
             return None
 
-        if amount > cghs_rate * 1.5:
+        if similarity >= 0.75:
+            confidence = Confidence.HIGH
+            amount_threshold = 1.5
+        elif similarity >= 0.55:
+            confidence = Confidence.MEDIUM
+            amount_threshold = 2.0
+        else:
             self.issue_counter += 1
-            overcharge = amount - cghs_rate
-
-            procedure = benchmark.get("procedure", "Unknown")
-            match_strategy = benchmark.get("match_strategy", "unknown")
-            matched_query = benchmark.get("matched_query", description)
-
             return BillingIssue(
-                issue_id=f"{issue_prefix}_{self.issue_counter:03d}",
-                issue_type=IssueType.PROCEDURE_OVERCHARGE,
-                description=f"{description} significantly exceeds CGHS {benchmark_label} benchmark",
+                issue_id=f"REVIEW_{self.issue_counter:03d}",
+                issue_type=IssueType.MISSING_ITEMIZATION,
+                description=f"{description} — unable to verify against CGHS benchmark",
                 billed_amount=amount,
-                benchmark_amount=cghs_rate,
-                overcharge_amount=overcharge,
-                confidence=Confidence.HIGH,
+                benchmark_amount=None,
+                overcharge_amount=None,
+                confidence=Confidence.LOW,
                 evidence=[
-                    f"CGHS rate: ₹{cghs_rate:,.2f}",
                     f"Billed amount: ₹{amount:,.2f}",
-                    f"Markup: {(amount / cghs_rate - 1) * 100:.0f}%",
-                    f"Procedure: {procedure}",
-                    f"Matched by: {match_strategy}",
-                    f"Matched query: {matched_query}",
+                    f"Closest CGHS entry found: '{matched_procedure}' at ₹{cghs_rate:,.2f}",
+                    f"Match similarity: {similarity:.0%} (LOW — likely a different test/procedure)",
+                    "⚠️ Shown for reference only — this is a different procedure, not a benchmark for your bill",
+                    "Cannot confirm overcharge without exact procedure identification",
                 ],
-                action_required=action_required,
+                action_required=(
+                    "Request detailed itemization and procedure code from hospital. "
+                    "Cannot confirm overcharge without this information."
+                ),
+                benchmark_type="CGHS",
+                match_quality=similarity,
+                matched_procedure=matched_procedure,
             )
 
-        return None
+        if amount <= cghs_rate * amount_threshold:
+            return None
+
+        self.issue_counter += 1
+        overcharge = amount - cghs_rate
+
+        if confidence == Confidence.HIGH:
+            issue_description = (
+                f"{description} appears significantly above CGHS {benchmark_label} benchmark"
+            )
+            confidence_action = (
+                "Request hospital to justify charge or revise it with reference to CGHS rate. "
+                "Ask for procedure code and tariff card entry."
+            )
+        else:
+            issue_description = (
+                f"{description} may be above CGHS benchmark — verify test/procedure identity"
+            )
+            confidence_action = (
+                "Request itemization and procedure code from hospital. "
+                "Confirm exact test/procedure before challenging the charge."
+            )
+
+        return BillingIssue(
+            issue_id=f"{issue_prefix}_{self.issue_counter:03d}",
+            issue_type=IssueType.PROCEDURE_OVERCHARGE,
+            description=issue_description,
+            billed_amount=amount,
+            benchmark_amount=cghs_rate,
+            overcharge_amount=overcharge,
+            confidence=confidence,
+            evidence=[
+                f"CGHS reference rate: ₹{cghs_rate:,.2f}",
+                f"Billed amount: ₹{amount:,.2f}",
+                f"Difference: {(amount / cghs_rate - 1) * 100:.0f}% above benchmark",
+                f"Matched CGHS procedure: {matched_procedure}",
+                f"Match quality: {similarity:.0%} ({confidence.value} confidence)",
+                "Note: CGHS rates are government benchmarks. Private hospitals may charge above them with valid justification.",
+            ],
+            action_required=confidence_action,
+            benchmark_type="CGHS",
+            match_quality=similarity,
+            matched_procedure=matched_procedure,
+        )
 
     def _check_drug_price(self, item: Dict) -> BillingIssue | None:
         """Check drug pricing against NPPA ceiling."""
@@ -480,6 +547,9 @@ class BillShieldAgent:
                     f"Drug match: {best_match.get('drug_name', 'Unknown')}",
                 ],
                 action_required="Challenge drug pricing using NPPA ceiling price",
+                benchmark_type="NPPA",
+                match_quality=1.0,
+                matched_procedure=best_match.get("drug_name", "Unknown"),
             )
 
         return None
@@ -537,6 +607,9 @@ class BillShieldAgent:
                             "Matched as drug-eluting coronary stent device",
                         ],
                         action_required="Challenge stent pricing using NPPA device ceiling and request manufacturer invoice",
+                        benchmark_type="NPPA",
+                        match_quality=1.0,
+                        matched_procedure="Drug-eluting coronary stent",
                     )
 
         try:
@@ -572,6 +645,9 @@ class BillShieldAgent:
                             "NPPA device ceiling not found; using CGHS as reference",
                         ],
                         action_required="Request itemized device bill with manufacturer invoice",
+                        benchmark_type="CGHS",
+                        match_quality=valid_results[0].get("similarity", 0),
+                        matched_procedure=valid_results[0].get("procedure", "Unknown"),
                     )
 
             return None
@@ -601,6 +677,9 @@ class BillShieldAgent:
                     f"Overcharge: ₹{overcharge:,.2f}",
                 ],
                 action_required="Challenge device pricing using NPPA ceiling price",
+                benchmark_type="NPPA",
+                match_quality=similarity,
+                matched_procedure=best_match.get("device_name", "Unknown"),
             )
 
         return None
@@ -667,6 +746,9 @@ class BillShieldAgent:
                     "Per Consumer Protection Act, itemization is mandatory for charges > ₹5,000",
                 ],
                 action_required="Request itemized consumables list with quantities and rates",
+                benchmark_type="ITEMIZATION",
+                match_quality=0.0,
+                matched_procedure=None,
             )
 
         return None
@@ -711,6 +793,9 @@ class BillShieldAgent:
                         "Discharge summary is the authoritative record of care provided",
                     ],
                     action_required="Request detailed consultation log with doctor names, dates, and times",
+                    benchmark_type="DISCHARGE_CROSS_CHECK",
+                    match_quality=0.0,
+                    matched_procedure=None,
                 )
             )
 
@@ -739,6 +824,9 @@ class BillShieldAgent:
                     confidence=Confidence.HIGH,
                     evidence=raw["evidence"],
                     action_required=raw["action_required"],
+                    benchmark_type="IRDAI_MULTI_PROCEDURE",
+                    match_quality=1.0,
+                    matched_procedure="Multi-procedure billing rule",
                 )
             )
 
@@ -790,6 +878,9 @@ class BillShieldAgent:
                         "File escalation citing IRDAI timeline violation and request "
                         "interest at bank rate + 2%"
                     ),
+                    benchmark_type="IRDAI_TIMELINE",
+                    match_quality=1.0,
+                    matched_procedure="Claim settlement timeline",
                 )
             )
 
@@ -807,6 +898,9 @@ class BillShieldAgent:
                     confidence=Confidence.MEDIUM,
                     evidence=raw["evidence"],
                     action_required=raw["action_required"],
+                    benchmark_type="IRDAI_TIMELINE",
+                    match_quality=0.0,
+                    matched_procedure="Timeline validation",
                 )
             )
 
@@ -872,6 +966,9 @@ class BillShieldAgent:
                                 "Potential contradiction between policy exclusion and IRDAI rule",
                             ],
                             action_required="Escalate to insurer grievance cell citing IRDAI regulation",
+                            benchmark_type="IRDAI_POLICY",
+                            match_quality=0.0,
+                            matched_procedure=None,
                         )
                     )
 
@@ -907,10 +1004,81 @@ class BillShieldAgent:
                             action_required=(
                                 "Challenge rejection citing IRDAI non-payable list as authority"
                             ),
+                            benchmark_type="IRDAI_NON_PAYABLE",
+                            match_quality=similarity,
+                            matched_procedure=best_match.get("item", "N/A"),
                         )
                     )
 
         return issues
+
+    def _deduplicate_issues(self, issues: List[BillingIssue]) -> List[BillingIssue]:
+        """
+        Remove duplicate issues that flag the same charge.
+        Keeps the issue with highest confidence and largest overcharge.
+        """
+        import re
+
+        def normalize_description(desc: str) -> str:
+            """Normalize description for comparison."""
+            normalized = desc.lower()
+            prefixes = [
+                "obs & gynecology - ",
+                "obs & gyne - ",
+                "obs & gayne - ",
+                "cardiology - ",
+                "orthopedics - ",
+                "general surgery - ",
+                "deluxe ward - ",
+                "icu - ",
+                "general ward - ",
+            ]
+
+            for prefix in prefixes:
+                if normalized.startswith(prefix):
+                    normalized = normalized[len(prefix):]
+                    break
+
+            normalized = re.sub(r"[^\w\s]", "", normalized)
+            normalized = re.sub(r"\s+", " ", normalized).strip()
+            return normalized
+
+        groups = {}
+        for issue in issues:
+            key = (
+                normalize_description(issue.description),
+                round(issue.billed_amount, 2),
+            )
+            if key not in groups:
+                groups[key] = []
+            groups[key].append(issue)
+
+        confidence_rank = {
+            Confidence.HIGH: 3,
+            Confidence.MEDIUM: 2,
+            Confidence.LOW: 1,
+        }
+
+        deduplicated = []
+        for key, group in groups.items():
+            if len(group) == 1:
+                deduplicated.append(group[0])
+            else:
+                best = max(
+                    group,
+                    key=lambda issue: (
+                        confidence_rank.get(issue.confidence, 0),
+                        issue.overcharge_amount or 0,
+                    ),
+                )
+                print(
+                    f"🔧 Deduplicated {len(group)} issues for "
+                    f"'{key[0]}' → kept {best.issue_id}"
+                )
+                deduplicated.append(best)
+
+        print(f"📊 Deduplication: {len(issues)} → {len(deduplicated)} issues")
+        return deduplicated
 
     def _generate_result(
         self,
