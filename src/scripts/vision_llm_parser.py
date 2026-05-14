@@ -65,90 +65,81 @@ def build_vision_prompt(doc_type: str) -> str:
     """Build the extraction prompt based on document type."""
     
     if doc_type == "bill":
-        return """You are analyzing a hospital bill. Extract ALL line items with MAXIMUM ACCURACY.
+        return """You are analyzing a hospital bill. Extract data with MAXIMUM ACCURACY.
 
-CRITICAL EXTRACTION RULES:
+EXTRACTION HIERARCHY (in priority order):
 
-1. PROCEDURE DETECTION (IN ORDER OF PRIORITY):
-   a) If procedure name is EXPLICITLY written anywhere on bill → use exact name
-   b) If bill header/diagnosis/admission reason shows procedure → use that exact text
-   c) If ONLY department + generic charge visible → DO NOT GUESS, format as:
-      "[DEPARTMENT] - [CHARGE TYPE]"
-      Example: "CARDIOLOGY - PROCEDURE CHARGES" (NOT "Angioplasty")
-      Example: "ORTHOPEDICS - SURGERY CHARGES" (NOT "Knee Replacement")
+1. PROCEDURE NAME - Look in this order:
+   a) DIAGNOSIS field on bill (highest priority)
+   b) ADMISSION REASON / CHIEF COMPLAINT
+   c) PROCEDURE field or OPERATION NAME field
+   d) ICD-10 / CPT codes (extract the code itself)
+   e) Doctor's specialization + visible context
+   f) Department name (lowest priority - DO NOT GUESS)
 
-2. ROOM CATEGORY: Extract exact wording from bill
-   - ICU / ICCU / NICU / PICU / EMERGENCY
-   - DELUXE WARD / PRIVATE ROOM / TWIN SHARING / GENERAL WARD / DAY CARE
+2. LINE ITEM DESCRIPTION RULES:
 
-3. COMBINE VISIBLE INFORMATION ONLY:
-   ✅ GOOD: "CAESAREAN SECTION - OPERATION CHARGES" (if "Caesarean Section" visible)
-   ✅ GOOD: "OBS & GYNECOLOGY - OPERATION CHARGES" (if only department visible)
-   ❌ BAD: "ANGIOPLASTY - PROCEDURE CHARGES" (if bill doesn't say "Angioplasty")
+   RULE A: If procedure name is EXPLICITLY visible on bill:
+   - Combine it with each charge
+   - Format: "{PROCEDURE_NAME} - {ORIGINAL_CHARGE_TEXT}"
+   - Example: Bill says "Diagnosis: Acute Appendicitis" + "Operation Charges ₹45,000"
+   - Extract: "ACUTE APPENDICITIS - OPERATION CHARGES"
 
-4. LOOK FOR THESE PROCEDURE INDICATORS:
-   - Explicit procedure names in header/diagnosis section
-   - ICD-10 codes if visible
-   - CPT codes if visible
-   - Admission reason field
-   - Doctor's specialization notes
+   RULE B: If procedure name is NOT visible but department is:
+   - Use department + original charge
+   - Format: "{DEPARTMENT} - {ORIGINAL_CHARGE_TEXT}"
+   - Example: Only "Cardiology" + "Procedure Charges"
+   - Extract: "CARDIOLOGY - PROCEDURE CHARGES"
+   - Set procedure_name to null
 
-5. FOR MEDICINES:
-   - Extract exact brand name from bill
-   - Add generic name ONLY if shown in parentheses on bill
+   RULE C: For generic charges (Room/Nursing/Medicine):
+   - Use original description as-is
+   - Don't add procedure context unless useful
 
-RETURN ONLY VALID JSON (no markdown, no explanation):
+3. NEVER INFER OR GUESS:
+   ❌ Don't assume "Cardiology" = "Angioplasty"
+   ❌ Don't assume "Orthopedics" = "Knee Replacement"
+   ❌ Don't use medical knowledge to fill gaps
+   ✅ Only extract what is WRITTEN on the bill
+
+4. CONFIDENCE LEVELS:
+   - "high": Procedure name explicitly written on bill
+   - "medium": Inferred from clear context (diagnosis + department)
+   - "low": Only department visible, procedure unclear
+
+RETURN ONLY VALID JSON:
 {
-  "hospital_name": "Jubesta Hospital",
-  "patient_name": "K. Ruby Joseph",
-  "bill_number": "JH-901",
-  "bill_date": "02-Feb-2026",
-  "admission_date": "29-Jan-2026",
-  "discharge_date": "01-Feb-2026",
-  "department": "OBS & GYNECOLOGY",
-  "procedure_name": "CAESAREAN SECTION",
-  "room_category": "DELUXE WARD",
-  "total_amount": 63500.00,
+  "hospital_name": "exact name from bill",
+  "patient_name": "exact name from bill",
+  "bill_number": "exact bill/invoice number",
+  "bill_date": "DD-MMM-YYYY",
+  "admission_date": "DD-MMM-YYYY",
+  "discharge_date": "DD-MMM-YYYY",
+  "department": "exact department from bill or null",
+  "diagnosis": "exact diagnosis text from bill or null",
+  "procedure_name": "exact procedure if visible, else null",
+  "procedure_confidence": "high|medium|low",
+  "procedure_codes": ["ICD-10 or CPT codes if visible"],
+  "room_category": "exact room type from bill",
+  "total_amount": 0.0,
   "line_items": [
     {
-      "description": "DELUXE WARD BED CHARGES",
-      "quantity": 3.0,
-      "rate": 2000.00,
-      "amount": 6000.00,
-      "category": "Room Charges",
-      "department_context": "OBS & GYNECOLOGY"
-    },
-    {
-      "description": "CAESAREAN SECTION - OPERATION CHARGES",
+      "description": "formatted per rules above",
+      "original_text": "exact text from bill before any modification",
       "quantity": 1.0,
-      "rate": 22000.00,
-      "amount": 22000.00,
-      "category": "Procedure Charges",
-      "department_context": "OBS & GYNECOLOGY"
-    },
-    {
-      "description": "ANESTHETIC CHARGE",
-      "quantity": 1.0,
-      "rate": 8000.00,
-      "amount": 8000.00,
-      "category": "Procedure Charges",
-      "department_context": "OBS & GYNECOLOGY"
+      "rate": 0.0,
+      "amount": 0.0,
+      "category": "Room Charges|Medicine|Procedure Charges|Lab Tests|Consumables|Doctor Fees|Nursing Charges|Other"
     }
   ]
 }
 
-FIELD DEFINITIONS:
-- "procedure_name": Only if explicitly visible on bill, otherwise set to null
-- "department_context": Add to each line item for better matching
-- "description": Exact text from bill + department context if helpful
-- "category": "Room Charges" / "Medicine" / "Procedure Charges" / "Lab Tests" / "Consumables" / "Doctor Fees" / "Nursing Charges"
-
 CRITICAL RULES:
-- Parse amounts as numbers (remove ₹, commas)
-- DO NOT infer procedure names from department alone
-- DO NOT use medical knowledge to guess procedures
-- Only extract what is EXPLICITLY VISIBLE on the document
-- If procedure unclear, set procedure_name to null and rely on department_context
+- Always include "original_text" with EXACT bill wording (no modification)
+- "description" can have procedure/department prefix for better matching
+- Parse amounts as numbers (no ₹, no commas)
+- If unsure about procedure name, set to null and use department
+- Ensure valid JSON (proper commas, no trailing commas)
 """
     
     elif doc_type == "discharge":
