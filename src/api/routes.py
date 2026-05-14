@@ -120,73 +120,109 @@ async def upload_document(
 
 def parse_document(temp_file_path: str, doc_type: str, is_image: bool):
     """
-    Parse a document using the appropriate parser.
-    Falls back to vision LLM for images or when regex fails.
+    Parse a document using 3-tier fallback system:
+    1. Regex parser (fast, cheap)
+    2. Standard vision LLM (Anthropic/OpenAI)
+    3. Groq vision (final fallback for difficult scans)
     """
     if doc_type == 'bill':
         if is_image:
             print("📸 Image file - using vision LLM...")
             return parse_pdf_with_vision(temp_file_path, doc_type='bill')
         
-        # Try regex parser first for PDFs
+        # TIER 1: Try regex parser first for PDFs
         try:
+            print("🔍 TIER 1: Attempting regex parser...")
             data = parse_bill_pdf(temp_file_path)
             line_count = len(data.get('line_items', []))
             
-            # QUALITY CHECK: Verify we got meaningful data
+            # Quality check: Verify we got meaningful data
             has_amounts = any(
-                item.get('amount', 0) > 0
+                item.get('amount', 0) > 0 
                 for item in data.get('line_items', [])
             )
             has_descriptions = any(
-                item.get('description', '').strip()
+                len(item.get('description', '').strip()) > 3
                 for item in data.get('line_items', [])
             )
             
             if line_count == 0 or not (has_amounts and has_descriptions):
-                print(
-                    f"⚠️ Regex returned low-quality data "
-                    f"(items={line_count}, has_amounts={has_amounts}, "
-                    f"has_descriptions={has_descriptions})"
-                )
-                print("⚠️ Falling back to vision LLM...")
-                return parse_pdf_with_vision(temp_file_path, doc_type='bill')
+                print(f"⚠️ Regex returned low-quality data (items={line_count}, has_amounts={has_amounts}, has_descriptions={has_descriptions})")
+                raise ValueError("Regex quality check failed")
             
-            print(f"✓ Regex parser extracted {line_count} items")
+            print(f"✅ TIER 1 SUCCESS: Regex parser extracted {line_count} items")
             return data
-        except Exception as e:
-            print(f"⚠️ Regex parser failed: {e}, trying vision LLM...")
-            return parse_pdf_with_vision(temp_file_path, doc_type='bill')
+            
+        except Exception as regex_error:
+            print(f"⚠️ TIER 1 FAILED: {regex_error}")
+            
+            # TIER 2: Try standard vision LLM
+            try:
+                print("🔍 TIER 2: Attempting standard vision LLM...")
+                data = parse_pdf_with_vision(temp_file_path, doc_type='bill')
+                line_count = len(data.get('line_items', []))
+                
+                if line_count > 0:
+                    print(f"✅ TIER 2 SUCCESS: Vision LLM extracted {line_count} items")
+                    return data
+                else:
+                    raise ValueError("Vision LLM returned 0 items")
+                    
+            except Exception as vision_error:
+                print(f"⚠️ TIER 2 FAILED: {vision_error}")
+                
+                # TIER 3: Final fallback to Groq
+                try:
+                    print("🔍 TIER 3: Attempting Groq vision (final fallback)...")
+                    from src.scripts.groq_vision_parser import parse_with_groq_vision
+                    
+                    data = parse_with_groq_vision(temp_file_path, doc_type='bill')
+                    line_count = len(data.get('line_items', []))
+                    
+                    if line_count > 0:
+                        print(f"✅ TIER 3 SUCCESS: Groq vision extracted {line_count} items")
+                        return data
+                    else:
+                        raise ValueError("All parsers failed")
+                        
+                except Exception as groq_error:
+                    print(f"❌ TIER 3 FAILED: {groq_error}")
+                    print("❌ ALL PARSING TIERS EXHAUSTED")
+                    raise ValueError(f"All parsers failed: Regex={regex_error}, Vision={vision_error}, Groq={groq_error}")
     
     elif doc_type == 'discharge':
+        # Similar 3-tier structure for discharge
         if is_image:
-            print("📸 Image file - using vision LLM...")
             return parse_pdf_with_vision(temp_file_path, doc_type='discharge')
         
         try:
             data = parse_discharge_pdf(temp_file_path)
             if not data.get('patient_info', {}).get('name'):
-                print("⚠️ Regex returned empty data, falling back to vision LLM...")
-                return parse_pdf_with_vision(temp_file_path, doc_type='discharge')
+                raise ValueError("Discharge regex quality check failed")
             return data
-        except Exception as e:
-            print(f"⚠️ Regex parser failed: {e}, trying vision LLM...")
-            return parse_pdf_with_vision(temp_file_path, doc_type='discharge')
+        except Exception as e1:
+            try:
+                return parse_pdf_with_vision(temp_file_path, doc_type='discharge')
+            except Exception as e2:
+                from src.scripts.groq_vision_parser import parse_with_groq_vision
+                return parse_with_groq_vision(temp_file_path, doc_type='discharge')
     
     elif doc_type == 'rejection':
+        # Similar 3-tier structure for rejection
         if is_image:
-            print("📸 Image file - using vision LLM...")
             return parse_pdf_with_vision(temp_file_path, doc_type='rejection')
         
         try:
             data = parse_rejection_pdf(temp_file_path)
             if not data.get('claim_metadata', {}).get('claim_number'):
-                print("⚠️ Regex returned empty data, falling back to vision LLM...")
-                return parse_pdf_with_vision(temp_file_path, doc_type='rejection')
+                raise ValueError("Rejection regex quality check failed")
             return data
-        except Exception as e:
-            print(f"⚠️ Regex parser failed: {e}, trying vision LLM...")
-            return parse_pdf_with_vision(temp_file_path, doc_type='rejection')
+        except Exception as e1:
+            try:
+                return parse_pdf_with_vision(temp_file_path, doc_type='rejection')
+            except Exception as e2:
+                from src.scripts.groq_vision_parser import parse_with_groq_vision
+                return parse_with_groq_vision(temp_file_path, doc_type='rejection')
     
     return None
 
