@@ -402,9 +402,9 @@ class BillShieldAgent:
     def _create_episode_issue(self, episode: Dict, bill_data: Dict) -> BillingIssue | None:
         """Create a single grouped issue for a surgical or room-stay episode."""
         episode_type = episode["type"]
-        department = episode["department"]
-        items = episode["items"]
-        total = episode["total"]
+        department = episode.get("department", "Unknown")
+        items = episode.get("items", [])
+        total = episode.get("total", 0)
 
         self.issue_counter += 1
         bill_total = bill_data.get("total_amount", 0) or bill_data.get("grand_total", 0) or 0
