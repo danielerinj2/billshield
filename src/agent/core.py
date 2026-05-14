@@ -111,35 +111,53 @@ class BillShieldAgent:
         primary_issues, unmatched_items = self._analyze_bill_line_items(bill_data)
         issues.extend(primary_issues)
 
-        # NEW: Run Universal Agent on unmatched items
         if unmatched_items:
             print(f"\n🔧 Found {len(unmatched_items)} unmatched items, calling Universal Agent...")
+            try:
+                from src.agent.universal_agent import UniversalAgent
 
-            from src.agent.universal_agent import UniversalAgent
+                universal_agent = UniversalAgent(rag_system=self.rag)
 
-            universal_agent = UniversalAgent(rag_system=self.rag)
-
-            universal_issues = universal_agent.analyze_unmatched_items(
-                unmatched_items=unmatched_items,
-                bill_data=bill_data,
-            )
-
-            # Convert dict issues to BillingIssue objects
-            for univ_issue in universal_issues:
-                self.issue_counter += 1
-                issues.append(
-                    BillingIssue(
-                        issue_id=univ_issue["issue_id"],
-                        issue_type=IssueType(univ_issue["issue_type"]),
-                        description=univ_issue["description"],
-                        billed_amount=univ_issue["billed_amount"],
-                        benchmark_amount=univ_issue.get("benchmark_amount"),
-                        overcharge_amount=univ_issue.get("overcharge_amount"),
-                        confidence=Confidence(univ_issue["confidence"]),
-                        evidence=univ_issue["evidence"],
-                        action_required=univ_issue["action_required"],
-                    )
+                universal_issues = universal_agent.analyze_unmatched_items(
+                    unmatched_items=unmatched_items,
+                    bill_data=bill_data,
                 )
+
+                for univ_issue in universal_issues:
+                    self.issue_counter += 1
+
+                    try:
+                        issue_type_value = univ_issue.get(
+                            "issue_type",
+                            "procedure_overcharge",
+                        )
+                        confidence_value = univ_issue.get(
+                            "confidence",
+                            "medium",
+                        )
+
+                        issues.append(
+                            BillingIssue(
+                                issue_id=univ_issue["issue_id"],
+                                issue_type=IssueType(issue_type_value),
+                                description=univ_issue["description"],
+                                billed_amount=univ_issue["billed_amount"],
+                                benchmark_amount=univ_issue.get("benchmark_amount"),
+                                overcharge_amount=univ_issue.get("overcharge_amount"),
+                                confidence=Confidence(confidence_value),
+                                evidence=univ_issue["evidence"],
+                                action_required=univ_issue["action_required"],
+                            )
+                        )
+
+                    except Exception as e:
+                        print(f"⚠️ Failed to convert universal issue: {e}")
+                        continue
+
+            except Exception as universal_error:
+                print(f"⚠️ Universal Agent failed: {universal_error}")
+                import traceback
+                traceback.print_exc()
 
         if discharge_data:
             print("📄 Cross-referencing discharge summary...")
@@ -204,9 +222,30 @@ class BillShieldAgent:
             ):
                 issue = self._check_room_charges(item, bill_data)
 
+            elif category == "nursing charges" or "nursing" in description:
+                issue = self._check_cghs_overcharge(
+                    item=item,
+                    bill_data=bill_data,
+                    issue_prefix="NURSE",
+                    benchmark_label="nursing",
+                    action_required="Challenge nursing charge using CGHS benchmark",
+                )
+
             elif category == "procedure charges" or any(
                 keyword in description
-                for keyword in ["operation", "procedure", "surgery", "ot", "anesthet"]
+                for keyword in [
+                    "operation",
+                    "procedure",
+                    "surgery",
+                    "treatment",
+                    "ot ",
+                    "ot charges",
+                    "anesthet",
+                    "anaesthet",
+                    "dressing",
+                    "assistant",
+                    "surgeon",
+                ]
             ):
                 issue = self._check_procedure_charges(item, bill_data)
 
@@ -230,7 +269,7 @@ class BillShieldAgent:
             ):
                 issue = self._check_drug_price(item)
 
-            elif any(
+            elif category == "lab tests" or any(
                 keyword in description
                 for keyword in [
                     "ct scan",
@@ -241,17 +280,20 @@ class BillShieldAgent:
                     "ecg",
                     "echo",
                     "echocardiography",
+                    "lab",
+                    "test",
+                    "blood",
                 ]
             ):
                 issue = self._check_diagnostic_charges(item, bill_data)
 
-            elif any(
+            elif category == "doctor fees" or any(
                 keyword in description
                 for keyword in ["consultation", "doctor", "specialist", "visit", "consultant"]
             ):
                 issue = self._check_consultation_charges(item, bill_data)
 
-            elif any(
+            elif category == "consumables" or any(
                 keyword in description
                 for keyword in ["consumable", "disposable", "gloves", "syringe"]
             ):
@@ -313,7 +355,7 @@ class BillShieldAgent:
                 continue
 
             results = self.rag.search_cghs_rates(str(code), n_results=3)
-            valid_results = [r for r in results if r.get("rate", 0) > 0]
+            valid_results = [result for result in results if result.get("rate", 0) > 0]
 
             if valid_results:
                 best_match = valid_results[0]
@@ -329,7 +371,7 @@ class BillShieldAgent:
             return None
 
         results = self.rag.search_cghs_rates(query, n_results=3)
-        valid_results = [r for r in results if r.get("rate", 0) > 0]
+        valid_results = [result for result in results if result.get("rate", 0) > 0]
 
         if not valid_results:
             return None
@@ -508,7 +550,7 @@ class BillShieldAgent:
 
         if not device_results["documents"][0]:
             cghs_results = self.rag.search_cghs_rates(description, n_results=3)
-            valid_results = [r for r in cghs_results if r.get("rate", 0) > 0]
+            valid_results = [result for result in cghs_results if result.get("rate", 0) > 0]
 
             if valid_results:
                 cghs_rate = valid_results[0]["rate"]
@@ -906,6 +948,7 @@ class BillShieldAgent:
             for issue in issues
             if issue.confidence == Confidence.HIGH
         )
+
         medium_conf_total = sum(
             issue.overcharge_amount or 0
             for issue in issues
