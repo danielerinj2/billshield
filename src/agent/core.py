@@ -141,6 +141,13 @@ class BillShieldAgent:
             analyzer = PharmacyAnalyzer(rag_system=self.rag)
             return analyzer.analyze(bill_data)
 
+        elif doc_type == DocumentType.LAB_BILL:
+            print("🔀 Routing to Lab Analyzer...")
+            from src.agent.lab_analyzer import LabAnalyzer
+
+            analyzer = LabAnalyzer(rag_system=self.rag)
+            return analyzer.analyze(bill_data)
+
         elif doc_type == DocumentType.UNKNOWN:
             print("⚠️  Document type unclear - using hospital bill analyzer as fallback\n")
 
@@ -247,6 +254,60 @@ class BillShieldAgent:
         line_items = bill_data.get("line_items", [])
         if not line_items:
             return [], []
+
+        surgical_items = []
+        room_items = []
+        atomic_items = []
+
+        for item in line_items:
+            description = item.get("description", "").lower()
+            category = item.get("category", "").lower()
+
+            is_surgical = (
+                category == "procedure charges"
+                or any(keyword in description for keyword in SURGICAL_KEYWORDS)
+            )
+
+            is_room = (
+                category == "room charges"
+                or any(keyword in description for keyword in ROOM_KEYWORDS)
+            )
+
+            is_atomic = any(keyword in description for keyword in ATOMIC_KEYWORDS)
+
+            if is_surgical:
+                surgical_items.append(item)
+            elif is_room:
+                room_items.append(item)
+            elif is_atomic:
+                atomic_items.append(item)
+            else:
+                atomic_items.append(item)
+
+        episodes = []
+
+        if surgical_items:
+            episodes.append(
+                {
+                    "type": "surgical",
+                    "department": bill_data.get("department"),
+                    "procedure_name": bill_data.get("procedure_name"),
+                    "items": surgical_items,
+                    "total": sum(item.get("amount", 0) for item in surgical_items),
+                }
+            )
+
+        if room_items:
+            episodes.append(
+                {
+                    "type": "room_stay",
+                    "room_category": bill_data.get("room_category"),
+                    "items": room_items,
+                    "total": sum(item.get("amount", 0) for item in room_items),
+                }
+            )
+
+        return episodes, atomic_items
 
         # Group items by department/category
         dept_groups = {}
