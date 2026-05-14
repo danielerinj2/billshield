@@ -178,7 +178,7 @@ def _parse_with_vision_llm(file_path: Path, doc_type: DocumentType) -> dict:
         "parsed_at": datetime.now().isoformat(),
         "parser_version": "1.0",
         "parsing_method": "vision-llm",
-        "model": "llama-3.2-90b-vision-preview",
+        "model": "meta-llama/llama-4-scout-17b-16e-instruct",
     }
     
     return result
@@ -197,7 +197,7 @@ def _parse_with_vision_llm_image(image, doc_type: DocumentType, source_file: Pat
         "parsed_at": datetime.now().isoformat(),
         "parser_version": "1.0",
         "parsing_method": "vision-llm",
-        "model": "llama-3.2-90b-vision-preview",
+        "model": "meta-llama/llama-4-scout-17b-16e-instruct",
     }
     
     return result

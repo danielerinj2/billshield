@@ -1,7 +1,7 @@
 """
 Vision-LLM fallback for bills that OCR can't parse reliably.
 
-Uses Groq's llama-3.2-90b-vision-preview model to:
+Uses Groq's llama-4-scout-17b-16e-instruct model to:
 1. "See" the bill image directly
 2. Extract structured data from the visual layout
 3. Return JSON matching the standard parser schema
