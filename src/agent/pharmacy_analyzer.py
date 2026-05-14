@@ -269,7 +269,21 @@ class PharmacyAnalyzer:
     def _validate_totals(self, bill_data: Dict) -> BillingIssue | None:
         """Validate gross - discount = net."""
         line_items = bill_data.get("line_items", [])
-        total = bill_data.get("total_amount", 0)
+        total = bill_data.get("total_amount")
+        
+        # Guard: Handle missing or invalid total
+        if total is None or total == 0:
+            # Try to compute from line items as fallback
+            calculated_sum = sum(item.get("amount", 0) for item in line_items)
+            if calculated_sum == 0:
+                return None  # Skip validation entirely - no usable data
+            total = calculated_sum  # Use calculated as reference
+        
+        # Ensure total is numeric
+        try:
+            total = float(total)
+        except (TypeError, ValueError):
+            return None
         
         # Calculate sum of line items
         calculated_sum = sum(item.get("amount", 0) for item in line_items)
