@@ -13,7 +13,7 @@ from pathlib import Path
 def _extract_and_repair_json(text: str) -> dict:
     """
     Extract JSON from LLM response that may contain markdown or prose.
-    Handles common malformations from vision models.
+    Handles common malformations from vision models like Llama-4-Scout.
     """
     # Remove markdown code fences
     if "```json" in text:
@@ -21,7 +21,7 @@ def _extract_and_repair_json(text: str) -> dict:
     elif "```" in text:
         text = text.split("```")[1].split("```")[0]
 
-    # Remove leading prose
+    # Remove leading prose (common pattern: "Based on the image, here is...")
     text = text.strip()
 
     # Find first { and last }
@@ -38,21 +38,21 @@ def _extract_and_repair_json(text: str) -> dict:
         return json.loads(json_text)
     except json.JSONDecodeError as e:
         # Log the error but raise for tier 3 fallback
-        print(f"⚠️ JSON parse error: {e}")
+        print(f"⚠️  JSON parse error: {e}")
         print(f"📄 Attempted to parse: {json_text[:200]}...")
         raise
 
 
 def parse_with_groq_vision(image_path: str, doc_type: str = 'bill') -> dict:
     """
-    Parse a hospital bill using Groq's vision model as final fallback.
+    Parse a medical document using Groq's vision model as final fallback.
 
     Args:
         image_path: Path to the image/PDF file
         doc_type: Type of document ('bill', 'discharge', 'rejection')
 
     Returns:
-        dict: Parsed bill data in standardized format
+        dict: Parsed data in standardized format
     """
     groq_module = importlib.import_module("groq")
     Groq = groq_module.Groq
@@ -86,94 +86,108 @@ def parse_with_groq_vision(image_path: str, doc_type: str = 'bill') -> dict:
 
     # Build prompt based on doc type
     if doc_type == 'bill':
-        prompt = """You are analyzing a hospital bill. Extract ALL line items with MAXIMUM ACCURACY.
+        prompt = """You are analyzing a medical bill/invoice. Extract ALL line items with MAXIMUM ACCURACY.
 
-CRITICAL EXTRACTION RULES:
+CRITICAL: Return ONLY valid JSON. No explanations, no markdown, no "Based on the image" text.
+
+DOCUMENT TYPE DETECTION:
+1. HOSPITAL BILL indicators: Room charges, bed charges, operation charges, OT charges, department names
+2. PHARMACY BILL indicators: Bill of Supply, MRP, Batch No, Expiry, Tab/Cap/Inj, medicine names
+3. LAB BILL indicators: Test names, sample types, diagnostic center, pathology
+
+EXTRACTION RULES FOR HOSPITAL BILLS:
 
 1. PROCEDURE DETECTION (IN ORDER OF PRIORITY):
-   a) If procedure name is EXPLICITLY written anywhere on bill → use exact name
-   b) If bill header/diagnosis/admission reason shows procedure → use that exact text
-   c) If ONLY department + generic charge visible → DO NOT GUESS, format as:
-      "[DEPARTMENT] - [CHARGE TYPE]"
-      Example: "CARDIOLOGY - PROCEDURE CHARGES" (NOT "Angioplasty")
-      Example: "ORTHOPEDICS - SURGERY CHARGES" (NOT "Knee Replacement")
+   a) If procedure name EXPLICITLY written → use exact name
+   b) If bill header/diagnosis shows procedure → use that exact text
+   c) If ONLY department + generic charge → format as: "[DEPARTMENT] - [CHARGE TYPE]"
+      Example: "OBS & GYNECOLOGY - OPERATION CHARGES" (NOT "Caesarean Section" unless visible)
 
-2. ROOM CATEGORY: Extract exact wording from bill
+2. ROOM CATEGORY: Extract exact wording
    - ICU / ICCU / NICU / PICU / EMERGENCY
    - DELUXE WARD / PRIVATE ROOM / TWIN SHARING / GENERAL WARD / DAY CARE
 
-3. COMBINE VISIBLE INFORMATION ONLY:
-   ✅ GOOD: "CAESAREAN SECTION - OPERATION CHARGES" (if "Caesarean Section" visible)
-   ✅ GOOD: "OBS & GYNECOLOGY - OPERATION CHARGES" (if only department visible)
-   ❌ BAD: "ANGIOPLASTY - PROCEDURE CHARGES" (if bill doesn't say "Angioplasty")
+EXTRACTION RULES FOR PHARMACY BILLS:
 
-4. LOOK FOR THESE PROCEDURE INDICATORS:
-   - Explicit procedure names in header/diagnosis section
-   - ICD-10 codes if visible
-   - CPT codes if visible
-   - Admission reason field
-   - Doctor's specialization notes
+1. Extract product table with: Name, Batch, Expiry, Qty, MRP, Amount
+2. Look for: Gross Amount, Discount, Net Amount
+3. Preserve exact brand names and dosage forms (Tab/Cap/Inj/Syrup)
 
-5. FOR MEDICINES:
-   - Extract exact brand name from bill
-   - Add generic name ONLY if shown in parentheses on bill
+EXTRACTION RULES FOR LAB BILLS:
 
-RETURN ONLY VALID JSON (no markdown, no explanation):
+1. Extract each test with name and amount
+2. Look for: Test code, sample type, test category
+
+RETURN FORMAT (HOSPITAL BILL):
 {
-  "hospital_name": "Jubesta Hospital",
-  "patient_name": "K. Ruby Joseph",
-  "bill_number": "JH-901",
-  "bill_date": "02-Feb-2026",
-  "admission_date": "29-Jan-2026",
-  "discharge_date": "01-Feb-2026",
-  "department": "OBS & GYNECOLOGY",
-  "procedure_name": "CAESAREAN SECTION",
-  "room_category": "DELUXE WARD",
+  "hospital_name": "Hospital Name",
+  "patient_name": "Patient Name",
+  "bill_number": "BILL-123",
+  "bill_date": "DD-MMM-YYYY",
+  "admission_date": "DD-MMM-YYYY",
+  "discharge_date": "DD-MMM-YYYY",
+  "department": "Department Name",
+  "diagnosis": "diagnosis if visible",
+  "procedure_name": "procedure if explicitly visible, else null",
+  "procedure_confidence": "high/medium/low",
+  "procedure_codes": ["ICD-10 or CPT codes if visible"],
+  "room_category": "Room type",
   "total_amount": 63500.00,
   "line_items": [
     {
-      "description": "DELUXE WARD BED CHARGES",
-      "quantity": 3.0,
-      "rate": 2000.00,
-      "amount": 6000.00,
-      "category": "Room Charges",
-      "department_context": "OBS & GYNECOLOGY"
-    },
-    {
-      "description": "CAESAREAN SECTION - OPERATION CHARGES",
+      "description": "Item description",
+      "original_text": "Raw text from bill",
       "quantity": 1.0,
-      "rate": 22000.00,
-      "amount": 22000.00,
-      "category": "Procedure Charges",
-      "department_context": "OBS & GYNECOLOGY"
-    },
-    {
-      "description": "ANESTHETIC CHARGE",
-      "quantity": 1.0,
-      "rate": 8000.00,
-      "amount": 8000.00,
-      "category": "Procedure Charges",
-      "department_context": "OBS & GYNECOLOGY"
+      "rate": 1000.00,
+      "amount": 1000.00,
+      "category": "Room Charges/Medicine/Procedure Charges/Lab Tests/Consumables/Doctor Fees/Nursing Charges"
     }
   ]
 }
 
-FIELD DEFINITIONS:
-- "procedure_name": Only if explicitly visible on bill, otherwise set to null
-- "department_context": Add to each line item for better matching
-- "description": Exact text from bill + department context if helpful
-- "category": "Room Charges" / "Medicine" / "Procedure Charges" / "Lab Tests" / "Consumables" / "Doctor Fees" / "Nursing Charges"
+RETURN FORMAT (PHARMACY BILL):
+{
+  "hospital_name": "Pharmacy/Store Name",
+  "patient_name": "Patient Name",
+  "bill_number": "INV-123",
+  "bill_date": "DD-MMM-YYYY",
+  "admission_date": null,
+  "discharge_date": null,
+  "department": null,
+  "diagnosis": null,
+  "procedure_name": null,
+  "procedure_confidence": "low",
+  "procedure_codes": [],
+  "room_category": null,
+  "total_amount": 6454.00,
+  "line_items": [
+    {
+      "description": "Medicine name",
+      "original_text": "Raw text",
+      "quantity": 10.0,
+      "rate": 106.28,
+      "amount": 106.28,
+      "category": "Medicine",
+      "mrp": 106.28,
+      "batch_no": "batch if visible",
+      "expiry": "expiry if visible"
+    }
+  ]
+}
 
 CRITICAL RULES:
+- Return ONLY the JSON object, nothing else
 - Parse amounts as numbers (remove ₹, commas)
 - DO NOT infer procedure names from department alone
-- DO NOT use medical knowledge to guess procedures
-- Only extract what is EXPLICITLY VISIBLE on the document
-- If procedure unclear, set procedure_name to null and rely on department_context
+- Extract what is EXPLICITLY VISIBLE only
+- If unclear, set fields to null
+- For pharmacy bills, preserve MRP, batch, expiry if visible
 """
 
     elif doc_type == 'discharge':
-        prompt = """Extract patient info and diagnosis from this discharge summary. Return ONLY JSON:
+        prompt = """Extract patient info and diagnosis from this discharge summary.
+
+CRITICAL: Return ONLY valid JSON. No explanations, no markdown.
 
 {
   "patient_info": {
@@ -186,13 +200,15 @@ CRITICAL RULES:
   "diagnosis": {
     "primary": "main diagnosis",
     "secondary": ["other conditions"],
-    "procedures": ["procedures performed"]
+    "procedures": ["procedures performed with exact names"]
   },
-  "treatment_summary": "brief summary"
+  "treatment_summary": "brief summary of treatment given"
 }"""
 
     elif doc_type == 'rejection':
-        prompt = """Extract claim rejection details. Return ONLY JSON:
+        prompt = """Extract claim rejection details from this insurance document.
+
+CRITICAL: Return ONLY valid JSON. No explanations, no markdown.
 
 {
   "claim_metadata": {
@@ -208,11 +224,11 @@ CRITICAL RULES:
       "amount": 5000.00
     }
   ],
-  "insurer_notes": "any additional notes"
+  "insurer_notes": "any additional notes from insurer"
 }"""
 
     else:
-        prompt = "Extract all text from this image and structure it as JSON."
+        prompt = "Extract all text from this image and structure it as JSON. Return ONLY JSON, no explanations."
 
     try:
         # Call Groq vision API
@@ -241,13 +257,24 @@ CRITICAL RULES:
 
         result_text = response.choices[0].message.content.strip()
 
+        # Extract and repair JSON
         try:
             parsed_data = _extract_and_repair_json(result_text)
         except (json.JSONDecodeError, ValueError) as e:
-            print(f"⚠️ TIER 2 JSON extraction failed: {e}")
+            print(f"⚠️  TIER 2 JSON extraction failed: {e}")
+            print(f"📄 Raw response preview: {result_text[:300]}...")
             raise Exception(f"LLM returned invalid JSON: {e}")
 
-        print(f"✅ Groq vision parsed {len(parsed_data.get('line_items', []))} items")
+        # Validate required fields
+        if doc_type == 'bill':
+            if 'line_items' not in parsed_data:
+                parsed_data['line_items'] = []
+            if 'total_amount' not in parsed_data:
+                parsed_data['total_amount'] = sum(
+                    item.get('amount', 0) for item in parsed_data.get('line_items', [])
+                )
+
+        print(f"✅ TIER 2 SUCCESS: Vision LLM extracted {len(parsed_data.get('line_items', []))} items")
         return parsed_data
 
     except Exception as e:
