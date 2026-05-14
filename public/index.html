@@ -1279,26 +1279,31 @@
             </div>
         </div>
     </div>
-
     <!-- PAGE 4: RESULTS -->
     <div id="results" class="page">
         <div class="results-container">
             <div class="financial-summary">
                 <h1 style="font-size: 2.5rem; margin-bottom: 2rem;">Analysis Complete</h1>
+
                 <div class="summary-grid">
-                    <div class="summary-item">
-                        <div class="summary-label">Total Bill</div>
-                        <div class="summary-value">₹0</div>
-                    </div>
-                    <div class="summary-item">
-                        <div class="summary-label">Insurance Approved</div>
-                        <div class="summary-value">₹0</div>
-                    </div>
-                    <div class="summary-item">
-                        <div class="summary-label">Your Liability</div>
-                        <div class="summary-value">₹0</div>
+                    <div class="hero-stats">
+                        <div class="stat">
+                            <div class="stat-label">Total Bill</div>
+                            <div class="stat-value">₹<span id="totalBill">0</span></div>
+                        </div>
+
+                        <div class="stat">
+                            <div class="stat-label">Confirmed Overcharges</div>
+                            <div class="stat-value confirmed">₹<span id="confirmedOvercharge">0</span></div>
+                        </div>
+
+                        <div class="stat">
+                            <div class="stat-label">Unverified Charges</div>
+                            <div class="stat-value unverified">₹<span id="unverifiedCharges">0</span></div>
+                        </div>
                     </div>
                 </div>
+
                 <div class="recovery-highlight">
                     <h2 style="font-size: 1.75rem; margin-bottom: 0.5rem;">✓ Overcharges Found</h2>
                     <div class="overcharge-amount" style="font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem;">₹0</div>
@@ -1313,6 +1318,7 @@
                         <h2 style="font-size: 1.75rem;">High Confidence Issues</h2>
                         <span class="badge">0 Issues Found</span>
                     </div>
+
                     <div class="issues-list">
                         <!-- Issues will be inserted by renderIssueCard() -->
                     </div>
@@ -1855,6 +1861,28 @@ function renderIssueCard(issue) {
 function displayResults(results) {
     const analysis = results.analysis;
     const issues = results.issues || [];
+    const totalBillEl = document.getElementById('totalBill');
+if (totalBillEl) {
+    totalBillEl.textContent = (analysis.bill_total || 0).toLocaleString('en-IN');
+}
+
+const confirmedOverchargeEl = document.getElementById('confirmedOvercharge');
+if (confirmedOverchargeEl) {
+    confirmedOverchargeEl.textContent = (analysis.verified_overcharge || 0).toLocaleString('en-IN');
+}
+
+const unverifiedChargesEl = document.getElementById('unverifiedCharges');
+if (unverifiedChargesEl) {
+    const rawResult = analysis.raw_result || {};
+
+    const unverifiedTotal = rawResult.total_unverified_charges !== undefined
+        ? rawResult.total_unverified_charges
+        : issues
+            .filter(issue => issue.confidence !== 'high')
+            .reduce((sum, issue) => sum + Number(issue.overcharge_amount || 0), 0);
+
+    unverifiedChargesEl.textContent = unverifiedTotal.toLocaleString('en-IN');
+}
 
     console.log('📊 REAL API Response:', analysis);
     console.log('📋 Issues Array:', issues);

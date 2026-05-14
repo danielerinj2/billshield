@@ -25,6 +25,8 @@ class IssueType(Enum):
     REJECTION_DELAYED = "rejection_delayed"
     POLICY_VIOLATION = "policy_violation"
     MISSING_ITEMIZATION = "missing_itemization"
+    SURGICAL_PACKAGE = "surgical_package"
+    ROOM_STAY_PACKAGE = "room_stay_package"
 
 
 class Confidence(Enum):
@@ -67,6 +69,7 @@ class AnalysisResult:
     total_rejected: float
     total_patient_liability: float
     total_verified_overcharge: float
+    total_unverified_charges: float
     estimated_recoverable: Dict[str, float]
     issues: List[BillingIssue]
     summary: str
@@ -80,19 +83,35 @@ class AnalysisResult:
         }
 
 
+# Episode detection constants
+SURGICAL_KEYWORDS = [
+    "operation", "surgery", "ot ", "ot charges", "ot assistant",
+    "anesthet", "anaesthet", "surgeon", "procedure charges",
+    "dressing", "assistant", "operative",
+]
+
+ROOM_KEYWORDS = [
+    "room", "bed", "ward", "icu", "ccu", "nicu", "picu", "hdu",
+    "deluxe", "private", "general ward", "semi-private", "suite",
+]
+
+ATOMIC_KEYWORDS = [
+    "blood", "cbc", "lft", "rft", "kft", "test", "lab",
+    "x-ray", "xray", "mri", "ct scan", "ultrasound", "ecg", "echo",
+    "consultation", "consultant", "doctor", "specialist", "visit",
+    "tablet", "syrup", "injection", "medicine", "drug",
+    "stent", "implant", "catheter", "valve", "mesh",
+]
+
+
 class BillShieldAgent:
     """
     Main agent orchestrator for bill analysis.
-    Implements SPAOR pattern: Search, Plan, Act, Observe, Reflect.
+    Implements episode detection + atomic benchmarking.
     """
 
     def __init__(self, rag_system=None):
-        """
-        Initialize agent with RAG system.
-
-        Args:
-            rag_system: BillShieldRAG instance
-        """
+        """Initialize agent with RAG system."""
         self.rag = rag_system
         self.issue_counter = 0
 
@@ -110,17 +129,28 @@ class BillShieldAgent:
 
         issues = []
 
-        print("📋 Analyzing bill line items...")
-        primary_issues, unmatched_items = self._analyze_bill_line_items(bill_data)
-        issues.extend(primary_issues)
+        # Detect episodes (surgical packages, room stays) first
+        print("🔍 Detecting episodic charges (surgical packages, room stays)...")
+        episodes, atomic_items = self._detect_episodes(bill_data)
+        print(f"📦 Found {len(episodes)} episode(s), {len(atomic_items)} atomic item(s)")
 
+        # Create one issue per episode (no benchmarking sub-charges)
+        for episode in episodes:
+            episode_issue = self._create_episode_issue(episode, bill_data)
+            if episode_issue:
+                issues.append(episode_issue)
+
+        # Run atomic items through existing benchmark logic
+        print("\n📋 Analyzing atomic line items...")
+        atomic_issues, unmatched_items = self._analyze_atomic_items(atomic_items, bill_data)
+        issues.extend(atomic_issues)
+
+        # Universal agent for unmatched atomic items
         if unmatched_items:
             print(f"\n🔧 Found {len(unmatched_items)} unmatched items, calling Universal Agent...")
             try:
                 from src.agent.universal_agent import UniversalAgent
-
                 universal_agent = UniversalAgent(rag_system=self.rag)
-
                 universal_issues = universal_agent.analyze_unmatched_items(
                     unmatched_items=unmatched_items,
                     bill_data=bill_data,
@@ -128,45 +158,29 @@ class BillShieldAgent:
 
                 for univ_issue in universal_issues:
                     self.issue_counter += 1
-
                     try:
-                        issue_type_value = univ_issue.get(
-                            "issue_type",
-                            "procedure_overcharge",
-                        )
-                        confidence_value = univ_issue.get(
-                            "confidence",
-                            "medium",
-                        )
-
                         issues.append(
                             BillingIssue(
                                 issue_id=univ_issue["issue_id"],
-                                issue_type=IssueType(issue_type_value),
+                                issue_type=IssueType(univ_issue.get("issue_type", "procedure_overcharge")),
                                 description=univ_issue["description"],
                                 billed_amount=univ_issue["billed_amount"],
                                 benchmark_amount=univ_issue.get("benchmark_amount"),
                                 overcharge_amount=univ_issue.get("overcharge_amount"),
-                                confidence=Confidence(confidence_value),
+                                confidence=Confidence(univ_issue.get("confidence", "medium")),
                                 evidence=univ_issue["evidence"],
                                 action_required=univ_issue["action_required"],
                             )
                         )
-
                     except Exception as e:
                         print(f"⚠️ Failed to convert universal issue: {e}")
                         continue
-
             except Exception as universal_error:
                 print(f"⚠️ Universal Agent failed: {universal_error}")
-                import traceback
-                traceback.print_exc()
 
         if discharge_data:
             print("📄 Cross-referencing discharge summary...")
             issues.extend(self._cross_reference_discharge(bill_data, discharge_data))
-
-        if discharge_data:
             print("🔧 Checking multi-procedure billing discounts...")
             issues.extend(self._check_multi_procedure_billing(bill_data, discharge_data))
 
@@ -179,38 +193,227 @@ class BillShieldAgent:
             issues.extend(self._check_policy_compliance(bill_data, rejection_data))
 
         print(f"\n✅ Found {len(issues)} potential issues")
-        print("🧮 Calculating totals and confidence scores...\n")
-
         issues = self._deduplicate_issues(issues)
-        issues = self._group_surgical_packages(issues)
 
         result = self._generate_result(bill_data, rejection_data, issues)
 
         print(f"{'=' * 70}")
         print(f"Analysis Complete: {len(result.issues)} issues flagged")
-        print(
-            f"Estimated Recoverable: "
-            f"₹{result.estimated_recoverable['min']:,.0f} - "
-            f"₹{result.estimated_recoverable['max']:,.0f}"
-        )
+        print(f"Confirmed overcharges: ₹{result.total_verified_overcharge:,.0f}")
+        print(f"Unverified charges: ₹{result.total_unverified_charges:,.0f}")
         print(f"{'=' * 70}\n")
 
         return result
 
-    def _analyze_bill_line_items(self, bill_data: Dict) -> tuple[List[BillingIssue], List[Dict]]:
+    def _detect_episodes(self, bill_data: Dict) -> tuple[List[Dict], List[Dict]]:
         """
-        Analyze line items and return BOTH matched issues AND unmatched items.
+        Detect episodic charges (surgical packages, room stays) vs atomic charges.
+
+        Returns:
+            (episodes, atomic_items) where each episode is a dict with:
+                - type: 'surgical' or 'room_stay'
+                - department: e.g. 'OBS & GYNE'
+                - items: list of line items in this episode
+                - total: sum of amounts
         """
+        line_items = bill_data.get("line_items", [])
+        if not line_items:
+            return [], []
+
+        # Group items by department/category
+        dept_groups = {}
+        for item in line_items:
+            desc = item.get("description", "").lower()
+            category = item.get("category", "").lower()
+            amount = item.get("amount", 0)
+
+            if amount == 0:
+                continue
+
+            # Identify which group this item belongs to
+            group_key = self._classify_item_for_episode(desc, category)
+            if group_key not in dept_groups:
+                dept_groups[group_key] = []
+            dept_groups[group_key].append(item)
+
+        episodes = []
+        atomic_items = []
+
+        for group_key, items in dept_groups.items():
+            group_type, group_label = group_key
+
+            if group_type == "surgical" and len(items) >= 2:
+                # Confirm it's a surgical episode (has at least one surgical keyword)
+                has_surgical_marker = any(
+                    any(kw in item.get("description", "").lower() for kw in SURGICAL_KEYWORDS)
+                    for item in items
+                )
+                if has_surgical_marker:
+                    episodes.append({
+                        "type": "surgical",
+                        "department": group_label,
+                        "items": items,
+                        "total": sum(i.get("amount", 0) for i in items),
+                    })
+                    continue
+
+            if group_type == "room_stay" and len(items) >= 2:
+                episodes.append({
+                    "type": "room_stay",
+                    "department": group_label,
+                    "items": items,
+                    "total": sum(i.get("amount", 0) for i in items),
+                })
+                continue
+
+            # Not an episode - add to atomic
+            atomic_items.extend(items)
+
+        return episodes, atomic_items
+
+    def _classify_item_for_episode(self, description: str, category: str) -> tuple[str, str]:
+        """
+        Classify an item to determine if it belongs to a surgical or room-stay episode.
+
+        Returns:
+            (episode_type, department_label) tuple as a group key.
+            episode_type: 'surgical', 'room_stay', or 'atomic'
+        """
+        desc = description.lower()
+
+        # Atomic checks first (highest priority - these are never grouped)
+        if any(kw in desc for kw in ATOMIC_KEYWORDS):
+            return ("atomic", desc)
+
+        # Surgical episode detection: looks for department prefix + surgical context
+        surgical_departments = [
+            "obs & gyne", "obs & gynecology", "obs & gayne", "obstetric", "gynecology",
+            "cardiology", "cardiac", "orthopedic", "ortho", "neurology", "neuro",
+            "general surgery", "surgery", "urology", "ent", "ophthalmology",
+        ]
+
+        for dept in surgical_departments:
+            if dept in desc:
+                # Check if this has surgical keywords or procedure category
+                if any(kw in desc for kw in SURGICAL_KEYWORDS) or "procedure" in category:
+                    return ("surgical", dept.upper())
+
+        # Room/ward stay episode detection
+        for room_kw in ROOM_KEYWORDS:
+            if room_kw in desc:
+                # Extract room type as label
+                for room_type in ["deluxe", "private", "icu", "ccu", "nicu", "general ward", "semi-private", "suite"]:
+                    if room_type in desc:
+                        return ("room_stay", room_type.upper())
+                return ("room_stay", "ROOM/WARD")
+
+        # Default: atomic (will be benchmarked individually)
+        return ("atomic", desc)
+
+    def _create_episode_issue(self, episode: Dict, bill_data: Dict) -> BillingIssue | None:
+        """Create a single grouped issue for a surgical or room-stay episode."""
+        episode_type = episode["type"]
+        department = episode["department"]
+        items = episode["items"]
+        total = episode["total"]
+
+        self.issue_counter += 1
+        bill_total = bill_data.get("total_amount", 0) or bill_data.get("grand_total", 0) or 0
+        share_pct = (total / bill_total * 100) if bill_total else 0
+
+        # Build evidence: list sub-charges
+        evidence = [
+            f"Total package amount: ₹{total:,.2f}",
+            f"This is {share_pct:.0f}% of your total bill (₹{bill_total:,.2f})" if bill_total else "",
+            "Components billed:",
+        ]
+        for item in items:
+            desc = item.get("description", "")
+            amt = item.get("amount", 0)
+            evidence.append(f"  • {desc}: ₹{amt:,.2f}")
+
+        evidence = [line for line in evidence if line]  # remove empty strings
+
+        if episode_type == "surgical":
+            procedure_name = bill_data.get("procedure_name")
+
+            if procedure_name:
+                # Procedure is known - we could benchmark, but for safety still group
+                description = f"{department} surgical package - {procedure_name}"
+                evidence.append(f"Procedure on file: {procedure_name}")
+                evidence.append("CGHS prices surgery as a package (includes OT, anesthesia, assistant, dressings)")
+                action = (
+                    f"Verify with hospital: (1) Is this a fixed package rate for {procedure_name}? "
+                    f"(2) What is the CGHS/hospital tariff for this procedure? "
+                    f"(3) Are all sub-charges (OT, anesthesia, assistant) included in the package?"
+                )
+            else:
+                description = f"{department} surgical package - procedure not specified on bill"
+                evidence.append("⚠️ The exact procedure name is not listed on this bill")
+                evidence.append("CGHS prices surgery as a single package (includes OT, anesthesia, assistant, dressings)")
+                action = (
+                    "Before paying, ask the hospital: "
+                    "(1) What is the exact procedure name and code? "
+                    "(2) Is this a fixed package, and what is the standard package rate for your room category? "
+                    "(3) Are OT, anesthesia, assistant charges and dressings included in that package? "
+                    "Once you have the procedure name, re-run the analysis for benchmark comparison."
+                )
+
+            return BillingIssue(
+                issue_id=f"PKG_{self.issue_counter:03d}",
+                issue_type=IssueType.SURGICAL_PACKAGE,
+                description=description,
+                billed_amount=total,
+                benchmark_amount=None,
+                overcharge_amount=None,
+                confidence=Confidence.LOW,
+                evidence=evidence,
+                action_required=action,
+                benchmark_type="CGHS",
+                match_quality=0.0,
+                matched_procedure=procedure_name,
+            )
+
+        elif episode_type == "room_stay":
+            room_category = bill_data.get("room_category", department)
+            description = f"{department} room/stay charges - needs tariff verification"
+            evidence.append(f"Room category: {room_category}")
+            evidence.append("Room charges should align with hospital's published daily tariff")
+
+            action = (
+                f"Ask the hospital: "
+                f"(1) What is the standard daily tariff for {room_category}? "
+                f"(2) Does this tariff include nursing, RMO, doctor visits? "
+                f"(3) Is your insurance room rent limit being applied correctly?"
+            )
+
+            return BillingIssue(
+                issue_id=f"ROOM_{self.issue_counter:03d}",
+                issue_type=IssueType.ROOM_STAY_PACKAGE,
+                description=description,
+                billed_amount=total,
+                benchmark_amount=None,
+                overcharge_amount=None,
+                confidence=Confidence.LOW,
+                evidence=evidence,
+                action_required=action,
+                benchmark_type="HOSPITAL_TARIFF",
+                match_quality=0.0,
+                matched_procedure=None,
+            )
+
+        return None
+
+    def _analyze_atomic_items(self, atomic_items: List[Dict], bill_data: Dict) -> tuple[List[BillingIssue], List[Dict]]:
+        """Analyze atomic (non-episode) line items individually."""
         issues = []
         unmatched_items = []
-        line_items = bill_data.get("line_items", [])
 
         procedure_name = bill_data.get("procedure_name", "")
         department = bill_data.get("department", "")
-
         print(f"🏥 Bill Context: Procedure={procedure_name}, Department={department}")
 
-        for item in line_items:
+        for item in atomic_items:
             description = item.get("description", "").lower()
             amount = item.get("amount", 0)
             category = item.get("category", "").lower()
@@ -219,90 +422,32 @@ class BillShieldAgent:
                 continue
 
             print(f"📝 Analyzing: {description} (₹{amount})")
-
             issue = None
 
-            if category == "room charges" or any(
-                keyword in description
-                for keyword in ["icu", "room", "bed", "ward"]
-            ):
-                issue = self._check_room_charges(item, bill_data)
-
-            elif category == "nursing charges" or "nursing" in description:
-                issue = self._check_cghs_overcharge(
-                    item=item,
-                    bill_data=bill_data,
-                    issue_prefix="NURSE",
-                    benchmark_label="nursing",
-                    action_required="Challenge nursing charge using CGHS benchmark",
-                )
-
-            elif category == "procedure charges" or any(
-                keyword in description
-                for keyword in [
-                    "operation",
-                    "procedure",
-                    "surgery",
-                    "treatment",
-                    "ot ",
-                    "ot charges",
-                    "anesthet",
-                    "anaesthet",
-                    "dressing",
-                    "assistant",
-                    "surgeon",
-                ]
-            ):
-                issue = self._check_procedure_charges(item, bill_data)
-
-            elif any(
-                keyword in description
-                for keyword in [
-                    "stent",
-                    "pacemaker",
-                    "implant",
-                    "catheter",
-                    "valve",
-                    "mesh",
-                    "prosthesis",
-                ]
-            ):
-                issue = self._check_device_price(item)
-
-            elif category == "medicine" or any(
-                keyword in description
-                for keyword in ["medicine", "drug", "tablet", "syrup", "injection"]
-            ):
+            # Drugs (NPPA benchmark)
+            if any(kw in description for kw in ["medicine", "drug", "tablet", "syrup", "injection"]):
                 issue = self._check_drug_price(item)
 
-            elif category == "lab tests" or any(
-                keyword in description
-                for keyword in [
-                    "ct scan",
-                    "mri",
-                    "x-ray",
-                    "xray",
-                    "ultrasound",
-                    "ecg",
-                    "echo",
-                    "echocardiography",
-                    "lab",
-                    "test",
-                    "blood",
-                ]
-            ):
-                issue = self._check_diagnostic_charges(item, bill_data)
+            # Devices (NPPA benchmark)
+            elif any(kw in description for kw in ["stent", "pacemaker", "implant", "catheter", "valve", "mesh", "prosthesis"]):
+                issue = self._check_device_price(item)
 
-            elif category == "doctor fees" or any(
-                keyword in description
-                for keyword in ["consultation", "doctor", "specialist", "visit", "consultant"]
-            ):
-                issue = self._check_consultation_charges(item, bill_data)
+            # Diagnostics (CGHS benchmark - per test)
+            elif any(kw in description for kw in ["ct scan", "mri", "x-ray", "xray", "ultrasound", "ecg", "echo", "lab", "test", "blood", "cbc"]):
+                issue = self._check_cghs_overcharge(
+                    item, bill_data, "DIAG", "diagnostic",
+                    "Challenge diagnostic charge using CGHS benchmark"
+                )
 
-            elif category == "consumables" or any(
-                keyword in description
-                for keyword in ["consumable", "disposable", "gloves", "syringe"]
-            ):
+            # Consultations (CGHS benchmark)
+            elif any(kw in description for kw in ["consultation", "consultant", "doctor", "specialist", "visit"]):
+                issue = self._check_cghs_overcharge(
+                    item, bill_data, "CONSULT", "consultation",
+                    "Challenge consultation charge using CGHS benchmark"
+                )
+
+            # Consumables (itemization check)
+            elif "consumable" in description or "disposable" in description:
                 issue = self._check_consumables(item)
 
             if issue:
@@ -311,13 +456,11 @@ class BillShieldAgent:
                 unmatched_items.append(item)
                 print("  ⚠️ No primary match - queued for Universal Agent")
 
-        print(f"🔍 Primary: {len(issues)} matched, {len(unmatched_items)} unmatched")
+        print(f"🔍 Atomic: {len(issues)} matched, {len(unmatched_items)} unmatched")
         return issues, unmatched_items
 
     def _match_to_benchmark(self, line_item: Dict, bill_data: Dict) -> Dict | None:
-        """
-        Match a line item to a CGHS benchmark using improved priority order.
-        """
+        """Match a line item to a CGHS benchmark."""
         if not self.rag:
             return None
 
@@ -328,93 +471,58 @@ class BillShieldAgent:
                 print(f"✅ Matched by code: {procedure_codes}")
                 return benchmark
 
-        procedure_name = bill_data.get("procedure_name")
-        if procedure_name:
-            print(f"🔎 Searching CGHS for procedure: {procedure_name}")
-            benchmark = self._fuzzy_search_cghs(procedure_name)
-            if benchmark:
-                print(f"✅ Matched by procedure name: {benchmark.get('procedure')}")
-                return benchmark
-
         description = line_item.get("description", "")
-        if procedure_name and description:
-            clean_desc = description.replace(bill_data.get("department", ""), "").replace("-", "").strip()
-            combined_query = f"{procedure_name} {clean_desc}"
-            print(f"🔎 Searching CGHS for combined: {combined_query}")
-            benchmark = self._fuzzy_search_cghs(combined_query)
-            if benchmark:
-                print(f"✅ Matched by combined: {benchmark.get('procedure')}")
-                return benchmark
-
         if description:
-            print(f"🔎 Searching CGHS for description: {description}")
+            print(f"🔎 Searching CGHS for: {description}")
             benchmark = self._fuzzy_search_cghs(description)
             if benchmark:
-                print(f"✅ Matched by description: {benchmark.get('procedure')}")
+                print(f"✅ Matched: {benchmark.get('procedure')} (sim: {benchmark.get('similarity', 0):.2f})")
                 return benchmark
 
-        print(f"❌ No CGHS match found for: {description}")
+        print(f"❌ No CGHS match for: {description}")
         return None
 
     def _search_by_code(self, procedure_codes: List[str]) -> Dict | None:
-        """Search CGHS benchmarks using visible ICD/CPT/procedure codes."""
+        """Search CGHS benchmarks using procedure codes."""
         if not self.rag:
             return None
 
         for code in procedure_codes:
             if not code:
                 continue
-
             results = self.rag.search_cghs_rates(str(code), n_results=3)
-            valid_results = [result for result in results if result.get("rate", 0) > 0]
-
+            valid_results = [r for r in results if r.get("rate", 0) > 0]
             if valid_results:
-                best_match = valid_results[0]
-                best_match["match_strategy"] = "procedure_code"
-                best_match["matched_query"] = str(code)
-                return best_match
-
+                best = valid_results[0]
+                best["match_strategy"] = "procedure_code"
+                return best
         return None
 
     def _fuzzy_search_cghs(self, query: str) -> Dict | None:
-        """Search CGHS benchmarks with similarity score."""
+        """Fuzzy search CGHS benchmarks."""
         if not self.rag or not query:
             return None
 
         results = self.rag.search_cghs_rates(query, n_results=3)
-        valid_results = [result for result in results if result.get("rate", 0) > 0]
-
+        valid_results = [r for r in results if r.get("rate", 0) > 0]
         if not valid_results:
             return None
 
-        best_match = valid_results[0]
-        best_match["match_strategy"] = "fuzzy_search"
-        best_match["matched_query"] = query
-        return best_match
-
-    def _web_search_cghs_rate(self, query: str) -> Dict | None:
-        """
-        Placeholder for future web search fallback.
-
-        Kept intentionally non-invasive: the agent currently should not invent
-        benchmarks. If no RAG benchmark exists, return None for manual review.
-        """
-        return None
+        best = valid_results[0]
+        best["match_strategy"] = "fuzzy_search"
+        return best
 
     def _check_cghs_overcharge(
-        self,
-        item: Dict,
-        bill_data: Dict,
-        issue_prefix: str,
-        benchmark_label: str,
-        action_required: str,
+        self, item: Dict, bill_data: Dict,
+        issue_prefix: str, benchmark_label: str, action_required: str,
     ) -> BillingIssue | None:
         """
-        Confidence-weighted CGHS benchmark checker.
+        Confidence-weighted CGHS checker for ATOMIC items only.
+        Surgical sub-charges should NEVER reach this function.
 
-        HIGH (similarity >= 0.75): Clear match, claim overcharge with strong wording.
-        MEDIUM (similarity 0.55-0.75): Possible match, request verification.
-        LOW (similarity < 0.55): Different test/procedure, request itemization only.
+        HIGH (similarity >= 0.75): Clear match, claim overcharge.
+        MEDIUM (similarity 0.65-0.75): Possible match, verify first.
+        LOW (similarity < 0.65): Different item, request itemization.
         """
         if not self.rag:
             return None
@@ -424,25 +532,21 @@ class BillShieldAgent:
 
         benchmark = self._match_to_benchmark(item, bill_data)
         if not benchmark:
-            # No benchmark found at all - still flag as needing itemization
             self.issue_counter += 1
             return BillingIssue(
                 issue_id=f"REVIEW_{self.issue_counter:03d}",
                 issue_type=IssueType.MISSING_ITEMIZATION,
-                description=f"{description} — needs procedure identification",
+                description=f"{description} — needs identification",
                 billed_amount=amount,
                 benchmark_amount=None,
                 overcharge_amount=None,
                 confidence=Confidence.LOW,
                 evidence=[
                     f"Billed amount: ₹{amount:,.2f}",
-                    "No reliable benchmark match found for this charge",
-                    "Cannot verify pricing without exact procedure name and code",
+                    "No reliable benchmark match found",
+                    "Cannot verify without exact item name or code",
                 ],
-                action_required=(
-                    "Request itemization and procedure code from hospital. "
-                    "Ask: what exact procedure was performed and what is its tariff entry?"
-                ),
+                action_required="Request itemization and exact item/test name from hospital.",
                 benchmark_type="CGHS",
                 match_quality=0.0,
                 matched_procedure=None,
@@ -455,21 +559,20 @@ class BillShieldAgent:
         if not cghs_rate:
             return None
 
-        # Determine confidence tier based on match quality
+        # Stricter thresholds for atomic items
         if similarity >= 0.75:
             confidence = Confidence.HIGH
             amount_threshold = 1.5
-        elif similarity >= 0.55:
+        elif similarity >= 0.65:
             confidence = Confidence.MEDIUM
             amount_threshold = 2.0
         else:
-            # LOW CONFIDENCE: Clean, patient-friendly evidence
-            # Do NOT show confusing CGHS benchmark details
+            # LOW confidence: clean evidence, no misleading CGHS numbers
             self.issue_counter += 1
             return BillingIssue(
                 issue_id=f"REVIEW_{self.issue_counter:03d}",
                 issue_type=IssueType.MISSING_ITEMIZATION,
-                description=f"{description} — needs procedure identification",
+                description=f"{description} — needs identification",
                 billed_amount=amount,
                 benchmark_amount=None,
                 overcharge_amount=None,
@@ -477,20 +580,19 @@ class BillShieldAgent:
                 evidence=[
                     f"Billed amount: ₹{amount:,.2f}",
                     "No reliable CGHS match found for this charge",
-                    "Cannot verify pricing without exact procedure name and code from hospital",
+                    "Cannot verify without exact item name or test code",
                 ],
                 action_required=(
-                    "Before paying, ask the hospital: "
-                    "(1) What exact procedure does this charge cover? "
-                    "(2) What is the procedure code or tariff card entry? "
-                    "(3) Is this a standalone charge or part of a package?"
+                    "Ask the hospital: "
+                    "(1) What exact item/test does this cover? "
+                    "(2) What is the CGHS or hospital tariff code? "
+                    "(3) Is this billed individually or as part of a package?"
                 ),
                 benchmark_type="CGHS",
                 match_quality=similarity,
-                matched_procedure=None,  # Intentionally hidden from LOW confidence cards
+                matched_procedure=None,
             )
 
-        # HIGH or MEDIUM: Check if amount significantly exceeds benchmark
         if amount <= cghs_rate * amount_threshold:
             return None
 
@@ -498,20 +600,16 @@ class BillShieldAgent:
         overcharge = amount - cghs_rate
 
         if confidence == Confidence.HIGH:
-            issue_description = (
-                f"{description} appears significantly above CGHS {benchmark_label} benchmark"
-            )
+            issue_description = f"{description} significantly above CGHS {benchmark_label} benchmark"
             confidence_action = (
-                "Request hospital to justify charge or revise it with reference to CGHS rate. "
-                "Ask for procedure code and tariff card entry."
+                "Request hospital to justify or revise this charge using CGHS rate. "
+                "Cite the matched CGHS procedure and tariff entry."
             )
         else:  # MEDIUM
-            issue_description = (
-                f"{description} may be above CGHS benchmark — verify test/procedure identity"
-            )
+            issue_description = f"{description} may be above CGHS benchmark — verify identity"
             confidence_action = (
-                "Request itemization and procedure code from hospital. "
-                "Confirm exact test/procedure before challenging the charge."
+                "Before challenging: verify this is the exact CGHS-matched test/procedure. "
+                "Request item code from hospital and cross-check the benchmark."
             )
 
         return BillingIssue(
@@ -526,9 +624,9 @@ class BillShieldAgent:
                 f"CGHS reference rate: ₹{cghs_rate:,.2f}",
                 f"Billed amount: ₹{amount:,.2f}",
                 f"Difference: {(amount / cghs_rate - 1) * 100:.0f}% above benchmark",
-                f"Matched CGHS procedure: {matched_procedure}",
+                f"Matched CGHS entry: {matched_procedure}",
                 f"Match quality: {similarity:.0%} ({confidence.value} confidence)",
-                "Note: CGHS rates are government benchmarks. Private hospitals may charge above them with valid justification.",
+                "Note: CGHS rates are government benchmarks. Private hospitals may charge above with valid justification.",
             ],
             action_required=confidence_action,
             benchmark_type="CGHS",
@@ -589,10 +687,7 @@ class BillShieldAgent:
         description = item.get("description", "")
         amount = item.get("amount", 0)
 
-        if any(
-            word in description.lower()
-            for word in ["stent", "drug-eluting", "drug eluting", "des"]
-        ):
+        if any(word in description.lower() for word in ["stent", "drug-eluting", "drug eluting", "des"]):
             device_results = self.rag.reference_collection.query(
                 query_texts=["drug eluting stent coronary stent DES"],
                 n_results=10,
@@ -606,9 +701,7 @@ class BillShieldAgent:
                 device_results["distances"][0],
             ):
                 combined = f"{doc} {metadata}".lower()
-                if "stent" in combined and (
-                    "drug" in combined or "eluting" in combined or "des" in combined
-                ):
+                if "stent" in combined and ("drug" in combined or "eluting" in combined or "des" in combined):
                     candidates.append((metadata, distance))
 
             if candidates:
@@ -641,42 +734,12 @@ class BillShieldAgent:
 
         try:
             device_results = self.rag.reference_collection.query(
-                query_texts=[description],
-                n_results=3,
-                where={"type": "nppa_device"},
+                query_texts=[description], n_results=3, where={"type": "nppa_device"},
             )
         except Exception:
             return None
 
         if not device_results["documents"][0]:
-            cghs_results = self.rag.search_cghs_rates(description, n_results=3)
-            valid_results = [result for result in cghs_results if result.get("rate", 0) > 0]
-
-            if valid_results:
-                cghs_rate = valid_results[0]["rate"]
-                if amount > cghs_rate * 2:
-                    self.issue_counter += 1
-                    overcharge = amount - cghs_rate
-
-                    return BillingIssue(
-                        issue_id=f"DEVICE_{self.issue_counter:03d}",
-                        issue_type=IssueType.DEVICE_OVERCHARGE,
-                        description=f"{description} exceeds CGHS benchmark (NPPA device data unavailable)",
-                        billed_amount=amount,
-                        benchmark_amount=cghs_rate,
-                        overcharge_amount=overcharge,
-                        confidence=Confidence.MEDIUM,
-                        evidence=[
-                            f"CGHS benchmark: ₹{cghs_rate:,.2f}",
-                            f"Billed amount: ₹{amount:,.2f}",
-                            "NPPA device ceiling not found; using CGHS as reference",
-                        ],
-                        action_required="Request itemized device bill with manufacturer invoice",
-                        benchmark_type="CGHS",
-                        match_quality=valid_results[0].get("similarity", 0),
-                        matched_procedure=valid_results[0].get("procedure", "Unknown"),
-                    )
-
             return None
 
         best_match = device_results["metadatas"][0][0]
@@ -711,46 +774,6 @@ class BillShieldAgent:
 
         return None
 
-    def _check_room_charges(self, item: Dict, bill_data: Dict) -> BillingIssue | None:
-        """Check room/ICU charges against CGHS rates."""
-        return self._check_cghs_overcharge(
-            item=item,
-            bill_data=bill_data,
-            issue_prefix="ROOM",
-            benchmark_label="room/ICU",
-            action_required="Request hospital's rate card justification for room/ICU markup",
-        )
-
-    def _check_diagnostic_charges(self, item: Dict, bill_data: Dict) -> BillingIssue | None:
-        """Check diagnostic test charges against CGHS rates."""
-        return self._check_cghs_overcharge(
-            item=item,
-            bill_data=bill_data,
-            issue_prefix="DIAG",
-            benchmark_label="diagnostic",
-            action_required="Challenge diagnostic charge using CGHS benchmark",
-        )
-
-    def _check_consultation_charges(self, item: Dict, bill_data: Dict) -> BillingIssue | None:
-        """Check consultation charges against CGHS rates."""
-        return self._check_cghs_overcharge(
-            item=item,
-            bill_data=bill_data,
-            issue_prefix="CONSULT",
-            benchmark_label="consultation",
-            action_required="Challenge consultation charge using CGHS benchmark",
-        )
-
-    def _check_procedure_charges(self, item: Dict, bill_data: Dict) -> BillingIssue | None:
-        """Check operation/procedure/surgery charges against CGHS rates."""
-        return self._check_cghs_overcharge(
-            item=item,
-            bill_data=bill_data,
-            issue_prefix="PROC",
-            benchmark_label="procedure",
-            action_required="Challenge procedure charge using CGHS benchmark",
-        )
-
     def _check_consumables(self, item: Dict) -> BillingIssue | None:
         """Flag aggregated consumables without itemization."""
         description = item.get("description", "")
@@ -758,7 +781,6 @@ class BillShieldAgent:
 
         if amount > 10000 and "consumable" in description.lower():
             self.issue_counter += 1
-
             return BillingIssue(
                 issue_id=f"CONS_{self.issue_counter:03d}",
                 issue_type=IssueType.MISSING_ITEMIZATION,
@@ -777,400 +799,235 @@ class BillShieldAgent:
                 match_quality=0.0,
                 matched_procedure=None,
             )
-
         return None
 
     def _cross_reference_discharge(self, bill_data: Dict, discharge_data: Dict) -> List[BillingIssue]:
         """Cross-reference bill against discharge summary for discrepancies."""
         issues = []
-
         consultation_items = [
             item for item in bill_data.get("line_items", [])
             if "consult" in item.get("description", "").lower()
         ]
-
         billed_consultations = len(consultation_items)
         discharge_procedures = len(discharge_data.get("procedures", []))
 
         if billed_consultations > discharge_procedures + 1:
             self.issue_counter += 1
-
             total_consult_charges = sum(item.get("amount", 0) for item in consultation_items)
             excess_consultations = billed_consultations - discharge_procedures
-            estimated_overcharge = total_consult_charges * (
-                excess_consultations / billed_consultations
-            )
+            estimated_overcharge = total_consult_charges * (excess_consultations / billed_consultations)
 
-            issues.append(
-                BillingIssue(
-                    issue_id=f"DISC_{self.issue_counter:03d}",
-                    issue_type=IssueType.DUPLICATE_BILLING,
-                    description=(
-                        f"Bill lists {billed_consultations} consultations but discharge "
-                        f"summary documents {discharge_procedures} procedures"
-                    ),
-                    billed_amount=total_consult_charges,
-                    benchmark_amount=total_consult_charges - estimated_overcharge,
-                    overcharge_amount=estimated_overcharge,
-                    confidence=Confidence.MEDIUM,
-                    evidence=[
-                        f"Consultations billed: {billed_consultations}",
-                        f"Procedures in discharge: {discharge_procedures}",
-                        f"Potential duplicate/phantom consultations: {excess_consultations}",
-                        "Discharge summary is the authoritative record of care provided",
-                    ],
-                    action_required="Request detailed consultation log with doctor names, dates, and times",
-                    benchmark_type="DISCHARGE_CROSS_CHECK",
-                    match_quality=0.0,
-                    matched_procedure=None,
-                )
-            )
-
+            issues.append(BillingIssue(
+                issue_id=f"DISC_{self.issue_counter:03d}",
+                issue_type=IssueType.DUPLICATE_BILLING,
+                description=f"Bill lists {billed_consultations} consultations but discharge summary documents {discharge_procedures} procedures",
+                billed_amount=total_consult_charges,
+                benchmark_amount=total_consult_charges - estimated_overcharge,
+                overcharge_amount=estimated_overcharge,
+                confidence=Confidence.MEDIUM,
+                evidence=[
+                    f"Consultations billed: {billed_consultations}",
+                    f"Procedures in discharge: {discharge_procedures}",
+                    f"Potential duplicate/phantom consultations: {excess_consultations}",
+                    "Discharge summary is the authoritative record of care provided",
+                ],
+                action_required="Request detailed consultation log with doctor names, dates, and times",
+                benchmark_type="DISCHARGE_CROSS_CHECK",
+                match_quality=0.0,
+                matched_procedure=None,
+            ))
         return issues
 
-    def _check_multi_procedure_billing(
-        self,
-        bill_data: Dict,
-        discharge_data: Dict,
-    ) -> List[BillingIssue]:
-        """
-        Check if multiple procedures were billed at 100%.
-        """
+    def _check_multi_procedure_billing(self, bill_data: Dict, discharge_data: Dict) -> List[BillingIssue]:
+        """Check if multiple procedures were billed at 100%."""
         raw_issues = detect_multi_procedure_violations(bill_data, discharge_data)
-
         issues = []
         for raw in raw_issues:
-            issues.append(
-                BillingIssue(
-                    issue_id=raw["issue_id"],
-                    issue_type=IssueType.UNBUNDLED_CHARGES,
-                    description=raw["description"],
-                    billed_amount=raw["billed_amount"],
-                    benchmark_amount=raw["benchmark_amount"],
-                    overcharge_amount=raw["overcharge_amount"],
-                    confidence=Confidence.HIGH,
-                    evidence=raw["evidence"],
-                    action_required=raw["action_required"],
-                    benchmark_type="IRDAI_MULTI_PROCEDURE",
-                    match_quality=1.0,
-                    matched_procedure="Multi-procedure billing rule",
-                )
-            )
-
+            issues.append(BillingIssue(
+                issue_id=raw["issue_id"],
+                issue_type=IssueType.UNBUNDLED_CHARGES,
+                description=raw["description"],
+                billed_amount=raw["billed_amount"],
+                benchmark_amount=raw["benchmark_amount"],
+                overcharge_amount=raw["overcharge_amount"],
+                confidence=Confidence.HIGH,
+                evidence=raw["evidence"],
+                action_required=raw["action_required"],
+                benchmark_type="IRDAI_MULTI_PROCEDURE",
+                match_quality=1.0,
+                matched_procedure="Multi-procedure billing rule",
+            ))
         return issues
 
     def _analyze_rejection(self, rejection_data: Dict, bill_data: Dict) -> List[BillingIssue]:
         """Analyze insurance rejection for IRDAI compliance."""
         issues = []
-
         timeline = rejection_data.get("timeline", {})
         rejection_days = timeline.get("discharge_to_rejection_days", 0)
 
         if rejection_days > 15:
             self.issue_counter += 1
-
             irdai_results = []
             if self.rag:
                 irdai_results = self.rag.search_irdai_regulations(
-                    "15 day claim settlement timeline",
-                    n_results=2,
-                    min_similarity=0.3,
+                    "15 day claim settlement timeline", n_results=2, min_similarity=0.3,
                 )
 
             financial_summary = rejection_data.get("financial_summary", {})
             rejected_amount = financial_summary.get("amount_rejected", 0)
-
             evidence = [
                 f"Rejection received {rejection_days} days after discharge",
                 "IRDAI mandates 15-day settlement timeline",
                 "Delay triggers auto-approval or interest penalty",
             ]
-
             if irdai_results:
-                evidence.append(
-                    f"Citation: {irdai_results[0]['reference']}, Page {irdai_results[0]['page']}"
-                )
+                evidence.append(f"Citation: {irdai_results[0]['reference']}, Page {irdai_results[0]['page']}")
 
-            issues.append(
-                BillingIssue(
-                    issue_id=f"REJ_{self.issue_counter:03d}",
-                    issue_type=IssueType.REJECTION_DELAYED,
-                    description="Claim settlement exceeded IRDAI 15-day timeline",
-                    billed_amount=rejected_amount,
-                    benchmark_amount=None,
-                    overcharge_amount=rejected_amount,
-                    confidence=Confidence.HIGH,
-                    evidence=evidence,
-                    action_required=(
-                        "File escalation citing IRDAI timeline violation and request "
-                        "interest at bank rate + 2%"
-                    ),
-                    benchmark_type="IRDAI_TIMELINE",
-                    match_quality=1.0,
-                    matched_procedure="Claim settlement timeline",
-                )
-            )
+            issues.append(BillingIssue(
+                issue_id=f"REJ_{self.issue_counter:03d}",
+                issue_type=IssueType.REJECTION_DELAYED,
+                description="Claim settlement exceeded IRDAI 15-day timeline",
+                billed_amount=rejected_amount,
+                benchmark_amount=None,
+                overcharge_amount=rejected_amount,
+                confidence=Confidence.HIGH,
+                evidence=evidence,
+                action_required="File escalation citing IRDAI timeline violation and request interest at bank rate + 2%",
+                benchmark_type="IRDAI_TIMELINE",
+                match_quality=1.0,
+                matched_procedure="Claim settlement timeline",
+            ))
 
         timeline_issues = validate_settlement_timelines(rejection_data)
         for raw in timeline_issues:
             self.issue_counter += 1
-            issues.append(
-                BillingIssue(
-                    issue_id=raw.get("issue_id", f"REJ_{self.issue_counter:03d}"),
-                    issue_type=IssueType.REJECTION_DELAYED,
-                    description=raw["description"],
-                    billed_amount=raw.get("billed_amount", 0),
-                    benchmark_amount=raw.get("benchmark_amount", 0),
-                    overcharge_amount=raw.get("overcharge_amount", 0),
-                    confidence=Confidence.MEDIUM,
-                    evidence=raw["evidence"],
-                    action_required=raw["action_required"],
-                    benchmark_type="IRDAI_TIMELINE",
-                    match_quality=0.0,
-                    matched_procedure="Timeline validation",
-                )
-            )
-
+            issues.append(BillingIssue(
+                issue_id=raw.get("issue_id", f"REJ_{self.issue_counter:03d}"),
+                issue_type=IssueType.REJECTION_DELAYED,
+                description=raw["description"],
+                billed_amount=raw.get("billed_amount", 0),
+                benchmark_amount=raw.get("benchmark_amount", 0),
+                overcharge_amount=raw.get("overcharge_amount", 0),
+                confidence=Confidence.MEDIUM,
+                evidence=raw["evidence"],
+                action_required=raw["action_required"],
+                benchmark_type="IRDAI_TIMELINE",
+                match_quality=0.0,
+                matched_procedure="Timeline validation",
+            ))
         return issues
 
-    def _check_policy_compliance(
-        self,
-        bill_data: Dict,
-        rejection_data: Dict | None,
-    ) -> List[BillingIssue]:
-        """
-        Check rejected items against user's policy terms and IRDAI regulations.
-        """
+    def _check_policy_compliance(self, bill_data: Dict, rejection_data: Dict | None) -> List[BillingIssue]:
+        """Check rejected items against user's policy terms and IRDAI regulations."""
         issues = []
-
         if not rejection_data or not self.rag:
             return issues
 
         rejection_reasons = rejection_data.get("rejection_reasons", [])
-
         for reason_obj in rejection_reasons:
             reason_text = reason_obj.get("reason", "")
             rejected_amount = reason_obj.get("amount", 0)
-
             if not reason_text or rejected_amount == 0:
                 continue
 
             policy_results = self.rag.search_policy_exclusions(reason_text, n_results=2)
-
-            irdai_results = self.rag.search_irdai_regulations(
-                f"claim rejection {reason_text}",
-                n_results=2,
-            )
+            irdai_results = self.rag.search_irdai_regulations(f"claim rejection {reason_text}", n_results=2)
 
             if policy_results and irdai_results:
                 policy_text = policy_results[0]["text"]
                 irdai_text = irdai_results[0]["text"]
-
-                if any(
-                    keyword in irdai_text.lower()
-                    for keyword in ["must be covered", "cannot exclude", "shall cover"]
-                ) and any(
-                    keyword in policy_text.lower()
-                    for keyword in ["not covered", "excluded", "exclusion"]
-                ):
+                if (any(kw in irdai_text.lower() for kw in ["must be covered", "cannot exclude", "shall cover"])
+                        and any(kw in policy_text.lower() for kw in ["not covered", "excluded", "exclusion"])):
                     self.issue_counter += 1
-
-                    issues.append(
-                        BillingIssue(
-                            issue_id=f"POL_{self.issue_counter:03d}",
-                            issue_type=IssueType.POLICY_VIOLATION,
-                            description=(
-                                f"Policy exclusion for '{reason_text}' may contradict "
-                                f"IRDAI regulation"
-                            ),
-                            billed_amount=rejected_amount,
-                            benchmark_amount=None,
-                            overcharge_amount=rejected_amount,
-                            confidence=Confidence.MEDIUM,
-                            evidence=[
-                                f"Policy clause: {policy_results[0].get('clause_number', 'N/A')}",
-                                f"IRDAI reference: {irdai_results[0].get('reference', 'N/A')}",
-                                "Potential contradiction between policy exclusion and IRDAI rule",
-                            ],
-                            action_required="Escalate to insurer grievance cell citing IRDAI regulation",
-                            benchmark_type="IRDAI_POLICY",
-                            match_quality=0.0,
-                            matched_procedure=None,
-                        )
-                    )
+                    issues.append(BillingIssue(
+                        issue_id=f"POL_{self.issue_counter:03d}",
+                        issue_type=IssueType.POLICY_VIOLATION,
+                        description=f"Policy exclusion for '{reason_text}' may contradict IRDAI regulation",
+                        billed_amount=rejected_amount,
+                        benchmark_amount=None,
+                        overcharge_amount=rejected_amount,
+                        confidence=Confidence.MEDIUM,
+                        evidence=[
+                            f"Policy clause: {policy_results[0].get('clause_number', 'N/A')}",
+                            f"IRDAI reference: {irdai_results[0].get('reference', 'N/A')}",
+                            "Potential contradiction between policy exclusion and IRDAI rule",
+                        ],
+                        action_required="Escalate to insurer grievance cell citing IRDAI regulation",
+                        benchmark_type="IRDAI_POLICY",
+                        match_quality=0.0,
+                        matched_procedure=None,
+                    ))
 
             non_payable_results = self.rag.search_non_payable_items(reason_text, n_results=3)
-
             if non_payable_results:
                 best_match = non_payable_results[0]
                 similarity = best_match.get("similarity", 0)
-
                 if similarity < 0.6:
                     self.issue_counter += 1
-
-                    issues.append(
-                        BillingIssue(
-                            issue_id=f"REJ_{self.issue_counter:03d}",
-                            issue_type=IssueType.REJECTION_INVALID,
-                            description=(
-                                f"Rejected item '{reason_text}' not found in IRDAI "
-                                f"non-payable list"
-                            ),
-                            billed_amount=rejected_amount,
-                            benchmark_amount=None,
-                            overcharge_amount=rejected_amount,
-                            confidence=Confidence.MEDIUM,
-                            evidence=[
-                                f"Rejection reason: {reason_text}",
-                                "Item not in IRDAI's official non-payable list",
-                                (
-                                    f"Closest match: {best_match.get('item', 'N/A')} "
-                                    f"(similarity: {similarity:.2f})"
-                                ),
-                            ],
-                            action_required=(
-                                "Challenge rejection citing IRDAI non-payable list as authority"
-                            ),
-                            benchmark_type="IRDAI_NON_PAYABLE",
-                            match_quality=similarity,
-                            matched_procedure=best_match.get("item", "N/A"),
-                        )
-                    )
-
+                    issues.append(BillingIssue(
+                        issue_id=f"REJ_{self.issue_counter:03d}",
+                        issue_type=IssueType.REJECTION_INVALID,
+                        description=f"Rejected item '{reason_text}' not found in IRDAI non-payable list",
+                        billed_amount=rejected_amount,
+                        benchmark_amount=None,
+                        overcharge_amount=rejected_amount,
+                        confidence=Confidence.MEDIUM,
+                        evidence=[
+                            f"Rejection reason: {reason_text}",
+                            "Item not in IRDAI's official non-payable list",
+                            f"Closest match: {best_match.get('item', 'N/A')} (similarity: {similarity:.2f})",
+                        ],
+                        action_required="Challenge rejection citing IRDAI non-payable list as authority",
+                        benchmark_type="IRDAI_NON_PAYABLE",
+                        match_quality=similarity,
+                        matched_procedure=best_match.get("item", "N/A"),
+                    ))
         return issues
 
     def _deduplicate_issues(self, issues: List[BillingIssue]) -> List[BillingIssue]:
-        """
-        Remove duplicate issues that flag the same charge.
-        Keeps the issue with highest confidence and largest overcharge.
-        """
+        """Remove duplicate issues that flag the same charge."""
         import re
 
         def normalize_description(desc: str) -> str:
-            """Normalize description for comparison."""
             normalized = desc.lower()
             prefixes = [
-                "obs & gynecology - ",
-                "obs & gyne - ",
-                "obs & gayne - ",
-                "cardiology - ",
-                "orthopedics - ",
-                "general surgery - ",
-                "deluxe ward - ",
-                "icu - ",
-                "general ward - ",
+                "obs & gynecology - ", "obs & gyne - ", "obs & gayne - ",
+                "cardiology - ", "orthopedics - ", "general surgery - ",
+                "deluxe ward - ", "icu - ", "general ward - ",
             ]
-
             for prefix in prefixes:
                 if normalized.startswith(prefix):
                     normalized = normalized[len(prefix):]
                     break
-
             normalized = re.sub(r"[^\w\s]", "", normalized)
             normalized = re.sub(r"\s+", " ", normalized).strip()
             return normalized
 
         groups = {}
         for issue in issues:
-            key = (
-                normalize_description(issue.description),
-                round(issue.billed_amount, 2),
-            )
+            key = (normalize_description(issue.description), round(issue.billed_amount, 2))
             if key not in groups:
                 groups[key] = []
             groups[key].append(issue)
 
-        confidence_rank = {
-            Confidence.HIGH: 3,
-            Confidence.MEDIUM: 2,
-            Confidence.LOW: 1,
-        }
-
+        confidence_rank = {Confidence.HIGH: 3, Confidence.MEDIUM: 2, Confidence.LOW: 1}
         deduplicated = []
         for key, group in groups.items():
             if len(group) == 1:
                 deduplicated.append(group[0])
             else:
-                best = max(
-                    group,
-                    key=lambda issue: (
-                        confidence_rank.get(issue.confidence, 0),
-                        issue.overcharge_amount or 0,
-                    ),
-                )
-                print(
-                    f"🔧 Deduplicated {len(group)} issues for "
-                    f"'{key[0]}' → kept {best.issue_id}"
-                )
+                best = max(group, key=lambda i: (confidence_rank.get(i.confidence, 0), i.overcharge_amount or 0))
+                print(f"🔧 Deduplicated {len(group)} issues for '{key[0]}' → kept {best.issue_id}")
                 deduplicated.append(best)
 
         print(f"📊 Deduplication: {len(issues)} → {len(deduplicated)} issues")
         return deduplicated
 
-    def _group_surgical_packages(self, issues: List[BillingIssue]) -> List[BillingIssue]:
-        """
-        Group related LOW-confidence surgical charges into package cards.
-        Reduces 5 separate OT/anesthesia/assistant cards into 1 "surgical package" card.
-        """
-        # Separate LOW confidence surgery-related issues from others
-        surgery_keywords = ['operation', 'ot ', 'anesthetic', 'anaesthetic', 'assistant', 'dressing']
-        
-        low_surgery = []
-        other_issues = []
-        
-        for issue in issues:
-            if issue.confidence == Confidence.LOW:
-                desc_lower = issue.description.lower()
-                if any(kw in desc_lower for kw in surgery_keywords):
-                    low_surgery.append(issue)
-                else:
-                    other_issues.append(issue)
-            else:
-                other_issues.append(issue)
-        
-        # If we have multiple LOW-confidence surgery charges, group them
-        if len(low_surgery) >= 3:
-            total_amount = sum(i.billed_amount for i in low_surgery)
-            descriptions = [i.description.split(' — ')[0] for i in low_surgery]  # Remove " — needs procedure identification"
-            
-            grouped = BillingIssue(
-                issue_id="PKG_001",
-                issue_type=IssueType.MISSING_ITEMIZATION,
-                description="Surgery package charges need procedure identification",
-                billed_amount=total_amount,
-                benchmark_amount=None,
-                overcharge_amount=None,
-                confidence=Confidence.LOW,
-                evidence=[
-                    f"Total surgery-related charges: ₹{total_amount:,.2f}",
-                    "Components: " + ", ".join(descriptions),
-                    "This appears to be a surgical package but the exact procedure is not specified on the bill",
-                    "Without the procedure name, we cannot verify against CGHS surgical packages",
-                ],
-                action_required=(
-                    "Before paying, ask the hospital: (1) What exact surgical procedure was performed? "
-                    "(2) What is the package code and tariff rate? "
-                    "(3) Are anesthesia, OT, and assistant fees included in the package or separate?"
-                ),
-                benchmark_type="CGHS",
-                match_quality=0.0,
-                matched_procedure=None,
-            )
-            
-            print(f"📦 Grouped {len(low_surgery)} LOW-confidence surgery charges into 1 package card")
-            return other_issues + [grouped]
-        
-        return issues
-
     def _generate_result(
-        self,
-        bill_data: Dict,
-        rejection_data: Dict | None,
-        issues: List[BillingIssue],
+        self, bill_data: Dict, rejection_data: Dict | None, issues: List[BillingIssue],
     ) -> AnalysisResult:
-        """Generate final analysis result with summary and recommendations."""
+        """Generate final analysis result with honest hero summary."""
         totals = bill_data.get("totals", {})
-
         total_bill = (
             totals.get("extracted_grand_total")
             or bill_data.get("total_amount")
@@ -1188,21 +1045,28 @@ class BillShieldAgent:
 
         total_patient_liability = total_bill - total_approved
 
+        # CONFIRMED overcharges: only HIGH confidence with actual overcharge_amount
         verified_overcharge = sum(
             issue.overcharge_amount for issue in issues
             if issue.confidence == Confidence.HIGH and issue.overcharge_amount
         )
 
-        high_conf_total = sum(
-            issue.overcharge_amount or 0
-            for issue in issues
-            if issue.confidence == Confidence.HIGH
+        # UNVERIFIED charges: episodes + LOW/MEDIUM confidence items that need clarification
+        unverified_charges = sum(
+            issue.billed_amount for issue in issues
+            if issue.confidence in (Confidence.LOW, Confidence.MEDIUM)
+            and issue.issue_type in (
+                IssueType.SURGICAL_PACKAGE,
+                IssueType.ROOM_STAY_PACKAGE,
+                IssueType.MISSING_ITEMIZATION,
+            )
         )
 
+        high_conf_total = verified_overcharge
         medium_conf_total = sum(
             issue.overcharge_amount or 0
             for issue in issues
-            if issue.confidence == Confidence.MEDIUM
+            if issue.confidence == Confidence.MEDIUM and issue.overcharge_amount
         )
 
         estimated_recoverable = {
@@ -1210,29 +1074,54 @@ class BillShieldAgent:
             "max": high_conf_total + medium_conf_total * 0.6,
         }
 
-        high_issues = [issue for issue in issues if issue.confidence == Confidence.HIGH]
-
-        summary = f"Found {len(issues)} potential issues ({len(high_issues)} high confidence). "
-        summary += f"Verified overcharges total ₹{verified_overcharge:,.0f}. "
-        summary += (
-            f"Estimated recoverable: ₹{estimated_recoverable['min']:,.0f} "
-            f"to ₹{estimated_recoverable['max']:,.0f}."
-        )
-
-        recommendations = [
-            (
-                f"Present evidence for {len(high_issues)} high-confidence overcharges "
-                f"(total ₹{high_conf_total:,.0f})"
-            ),
-            "Request itemized breakdown for all aggregated charges",
-            "Cite CGHS/NPPA benchmarks when challenging specific line items",
+        high_issues = [i for i in issues if i.confidence == Confidence.HIGH]
+        episode_issues = [
+            i for i in issues
+            if i.issue_type in (IssueType.SURGICAL_PACKAGE, IssueType.ROOM_STAY_PACKAGE)
         ]
+
+        # Build honest summary
+        summary_parts = []
+        if high_issues:
+            summary_parts.append(f"{len(high_issues)} confirmed overcharge(s) totalling ₹{verified_overcharge:,.0f}")
+        if episode_issues:
+            summary_parts.append(f"{len(episode_issues)} package(s) needing procedure verification")
+
+        unverified_count = sum(
+            1 for i in issues
+            if i.confidence == Confidence.LOW and i.issue_type == IssueType.MISSING_ITEMIZATION
+        )
+        if unverified_count:
+            summary_parts.append(f"{unverified_count} item(s) needing clarification")
+
+        if summary_parts:
+            summary = "Found: " + "; ".join(summary_parts) + "."
+        else:
+            summary = "No issues detected. Bill appears compliant with available benchmarks."
+
+        # Action plan
+        recommendations = []
+        if episode_issues:
+            recommendations.append(
+                "Before paying: identify the exact procedure name and CGHS/hospital package rate."
+            )
+        if high_issues:
+            recommendations.append(
+                f"Challenge {len(high_issues)} confirmed overcharge(s) totalling ₹{verified_overcharge:,.0f} with CGHS/NPPA citations."
+            )
+        if unverified_count:
+            recommendations.append(
+                "Request itemized breakdown for charges that could not be benchmarked."
+            )
 
         timeline = rejection_data.get("timeline", {}) if rejection_data else {}
         if timeline.get("discharge_to_rejection_days", 0) > 15:
             recommendations.append(
-                "File IRDAI escalation for delayed settlement (auto-approval rule)"
+                "File IRDAI escalation for delayed settlement (auto-approval rule)."
             )
+
+        if not recommendations:
+            recommendations = ["No action needed at this time."]
 
         return AnalysisResult(
             total_bill=total_bill,
@@ -1240,6 +1129,7 @@ class BillShieldAgent:
             total_rejected=total_rejected,
             total_patient_liability=total_patient_liability,
             total_verified_overcharge=verified_overcharge,
+            total_unverified_charges=unverified_charges,
             estimated_recoverable=estimated_recoverable,
             issues=issues,
             summary=summary,
@@ -1249,4 +1139,3 @@ class BillShieldAgent:
 
 if __name__ == "__main__":
     print("BillShield Agent Core - Ready for integration")
-    print("Import with: from src.agent.core import BillShieldAgent")
