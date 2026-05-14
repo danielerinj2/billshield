@@ -191,7 +191,6 @@ def parse_document(temp_file_path: str, doc_type: str, is_image: bool):
                     raise ValueError(f"All parsers failed: Regex={regex_error}, Vision={vision_error}, Groq={groq_error}")
     
     elif doc_type == 'discharge':
-        # Similar 3-tier structure for discharge
         if is_image:
             return parse_pdf_with_vision(temp_file_path, doc_type='discharge')
         
@@ -208,7 +207,6 @@ def parse_document(temp_file_path: str, doc_type: str, is_image: bool):
                 return parse_with_groq_vision(temp_file_path, doc_type='discharge')
     
     elif doc_type == 'rejection':
-        # Similar 3-tier structure for rejection
         if is_image:
             return parse_pdf_with_vision(temp_file_path, doc_type='rejection')
         
@@ -302,6 +300,13 @@ async def run_analysis(
         print(f"   Bill: {'✓' if bill_data else '✗'}")
         print(f"   Discharge: {'✓' if discharge_data else '✗'}")
         print(f"   Rejection: {'✓' if rejection_data else '✗'}")
+        
+        # DEBUG: Show what vision parser returned BEFORE agent runs
+        print("="*80)
+        print("🔍 DEBUG: VISION PARSER OUTPUT")
+        print("="*80)
+        print(json.dumps(bill_data, indent=2))
+        print("="*80)
         
         # Initialize RAG and agent
         rag = BillShieldRAG()
