@@ -1334,18 +1334,19 @@
         </div>
     </div>
 
-    <!-- PAGE 3: ANALYZING -->
+   <!-- PAGE 3: ANALYZING -->
     <div id="analyzing" class="page">
         <div class="analyzing-container">
             <div class="analyzing-icon"></div>
             <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">Analyzing Your Bill</h1>
-            <p style="color: var(--text-muted); margin-bottom: 3rem; font-size: 1.125rem;">This typically takes 8-15 minutes. We'll notify you when complete.</p>
+            <p style="color: var(--text-muted); margin-bottom: 3rem; font-size: 1.125rem;">Take a breather. This part takes a few minutes.</p>
 
             <div class="progress-container">
+                <div class="status-message" id="statusMessage" style="margin-bottom: 1.5rem; font-weight: 600; color: var(--text);">Starting analysis...</div>
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressBar"></div>
                 </div>
-                <div class="status-message" id="statusMessage">Uploading documents...</div>
+                <div class="quirky-message" id="quirkyMessage" style="margin-top: 1.5rem; font-style: italic; color: var(--text-muted); font-family: 'IBM Plex Sans', sans-serif; min-height: 2rem; transition: opacity 0.5s ease;">Reading between the lines (literally—hospitals love vague bundling)...</div>
             </div>
         </div>
     </div>
@@ -1736,6 +1737,51 @@
 // ==============================================
 
 const API_URL = 'https://billshield.up.railway.app';
+// Quirky rotating messages while analyzing
+const QUIRKY_MESSAGES = [
+    "Reading between the lines (literally—hospitals love vague bundling)...",
+    "Cross-checking medicine prices against MRP databases (spoiler: they never match)...",
+    "Counting how many times 'miscellaneous charges' appears...",
+    "Finding all the creative ways they spelled 'paracetamol'...",
+    "Doing the homework the hospital hoped you'd skip...",
+    "Building your case while you catch your breath...",
+    "Looking for the itemization they definitely forgot to provide...",
+    "Searching for medical billing creativity (they're very creative)...",
+    "Fact-checking the hospital's math (they're surprisingly bad at it)..."
+];
+
+let quirkyMessageInterval = null;
+let quirkyMessageIndex = 0;
+
+function startQuirkyMessages() {
+    const quirkyEl = document.getElementById('quirkyMessage');
+    if (!quirkyEl) return;
+    
+    // Show first message immediately
+    quirkyMessageIndex = 0;
+    quirkyEl.textContent = QUIRKY_MESSAGES[0];
+    quirkyEl.style.opacity = '1';
+    
+    // Clear any existing interval
+    if (quirkyMessageInterval) clearInterval(quirkyMessageInterval);
+    
+    // Rotate every 10 seconds, looping back to start
+    quirkyMessageInterval = setInterval(() => {
+        quirkyEl.style.opacity = '0';
+        setTimeout(() => {
+            quirkyMessageIndex = (quirkyMessageIndex + 1) % QUIRKY_MESSAGES.length;
+            quirkyEl.textContent = QUIRKY_MESSAGES[quirkyMessageIndex];
+            quirkyEl.style.opacity = '1';
+        }, 500);
+    }, 10000);
+}
+
+function stopQuirkyMessages() {
+    if (quirkyMessageInterval) {
+        clearInterval(quirkyMessageInterval);
+        quirkyMessageInterval = null;
+    }
+}
 
 async function createAnalysis(patientName) {
     try {
@@ -1847,6 +1893,7 @@ window.handleUpload = async function(event) {
     try {
         document.getElementById('upload').classList.remove('active');
         document.getElementById('analyzing').classList.add('active');
+        startQuirkyMessages();  // Start the quirky message loop
 
         updateStatus('Creating analysis...');
         const analysisId = await createAnalysis(patientName);
@@ -1869,13 +1916,14 @@ window.handleUpload = async function(event) {
 
         displayResults(results);
         window.currentAnalysisId = analysisId;
-
+        stopQuirkyMessages();  // Stop the quirky message loop
         document.getElementById('analyzing').classList.remove('active');
         document.getElementById('results').classList.add('active');
 
     } catch (error) {
         console.error('Analysis workflow error:', error);
         alert('Analysis failed: ' + error.message);
+        stopQuirkyMessages();  // Stop the quirky message loop on error
         document.getElementById('analyzing').classList.remove('active');
         document.getElementById('upload').classList.add('active');
     }
