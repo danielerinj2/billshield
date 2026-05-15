@@ -14,32 +14,39 @@ class LabAnalyzer:
         print("=" * 70)
         line_items = bill_data.get("line_items", [])
         print(f"🔬 Analyzing {len(line_items)} lab tests...")
-        
+
         issues = []
         for item in line_items:
             issue = self._check_arithmetic(item)
             if issue:
                 issues.append(issue)
-        
+
         repeat_issues = self._check_repeat_tests(line_items)
         issues.extend(repeat_issues)
-        
-        total_overcharge = sum(i.overcharge_amount for i in issues if i.overcharge_amount > 0)
-        bill_total = bill_data.get("total_amount") or sum(
+
+        total_bill = bill_data.get("total_amount") or sum(
             (item.get("amount") or 0) for item in line_items
         )
-        
+        verified_overcharge = sum(
+            (i.overcharge_amount or 0) for i in issues if (i.overcharge_amount or 0) > 0
+        )
+
         print(f"✅ Found {len(issues)} lab issues")
-        
+
         return AnalysisResult(
+            total_bill=total_bill,
+            total_approved=total_bill,
+            total_rejected=0.0,
+            total_patient_liability=total_bill,
+            total_verified_overcharge=verified_overcharge,
+            total_unverified_charges=0.0,
+            estimated_recoverable={"low": verified_overcharge * 0.5, "high": verified_overcharge},
             issues=issues,
-            total_overcharge=total_overcharge,
-            bill_total=bill_total,
-            confidence_breakdown={
-                "high": sum(1 for i in issues if i.confidence == Confidence.HIGH),
-                "medium": sum(1 for i in issues if i.confidence == Confidence.MEDIUM),
-                "low": sum(1 for i in issues if i.confidence == Confidence.LOW),
-            }
+            summary=f"Analyzed {len(line_items)} lab tests, found {len(issues)} issues.",
+            recommendations=[
+                "Verify each test was medically necessary.",
+                "Compare rates with CGHS lab tariff.",
+            ],
         )
 
     def _check_arithmetic(self, item: Dict):
