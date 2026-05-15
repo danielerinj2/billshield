@@ -37,7 +37,18 @@ LAB_SIGNALS = [
     "pathology", "radiology", "imaging",
     "cbc", "lft", "kft", "rft", "lipid profile",
     "mri", "ct scan", "x-ray", "xray", "ultrasound", "usg",
-    "blood test", "urine test", "biopsy"
+    "blood test", "urine test", "biopsy",
+    "laboratory", "laboratory report", "mg/dl", "miu/ml", "g%",
+    "hemoglobin", "haemoglobin", "glucose", "protein", "bilirubin",
+    "creatinine", "tsh", "thyroid", "cholesterol", "triglyceride",
+    "platelet", "rbc", "wbc", "leukocyte", "leucocyte",
+    "erythrocyte", "ketone", "urobilinogen", "neutrophil",
+    "lymphocyte", "monocyte", "eosinophil", "basophil",
+    "sgpt", "sgot", "alt", "ast", "ggt", "alkaline phosphatase",
+    "albumin", "globulin", "prothrombin", "inr",
+    "beta hcg", "hcg", "hbs ag", "hiv", "vdrl", "crp", "esr",
+    "biological ref", "reference range", "neuberg", "thyrocare",
+    "metropolis", "srl", "dr lal", "pathlab"
 ]
 
 DEVICE_SIGNALS = [
