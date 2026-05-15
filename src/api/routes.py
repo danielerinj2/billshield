@@ -402,6 +402,9 @@ async def run_analysis(
             "verified_overcharge": result.total_verified_overcharge
         }
     
+    except HTTPException:
+        # Let HTTPException (400 errors like multi-bill) pass through
+        raise
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
