@@ -3,6 +3,7 @@
 import json
 import os
 import tempfile
+from src.scripts.multi_bill_detector import detect_multi_bill
 from pathlib import Path
 from typing import List
 
@@ -125,6 +126,15 @@ def parse_document(temp_file_path: str, doc_type: str, is_image: bool):
     2. Standard vision LLM (Anthropic/OpenAI)
     3. Groq vision (final fallback for difficult scans)
     """
+    # Multi-bill detection (Phase 1.7)
+    if doc_type == 'bill' and not is_image:
+        multi_check = detect_multi_bill(temp_file_path)
+        if multi_check["is_multi"]:
+            raise ValueError(
+                f"Multi-bill PDF detected: found {multi_check['distinct_bills']} separate bills "
+                f"across {multi_check['page_count']} pages. Please upload each bill separately."
+            )
+    
     if doc_type == 'bill':
         if is_image:
             print("📸 Image file - using vision LLM...")
