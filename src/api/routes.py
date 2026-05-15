@@ -302,6 +302,9 @@ async def run_analysis(
                     rejection_data = parsed_data
                     print("✓ Rejection parsed")
                     
+            except HTTPException:
+                # Let HTTPException (like multi-bill errors) pass through
+                raise
             except Exception as parse_error:
                 print(f"❌ Error parsing {doc['doc_type']}: {str(parse_error)}")
                 import traceback
