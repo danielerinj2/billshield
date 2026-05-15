@@ -21,7 +21,7 @@ import pdfplumber
 # OCR-aware patterns: handle variable whitespace between labels and values
 HEADER_PATTERNS = {
     "hospital_name": r"^([A-Z][A-Z\s&,.'-]{5,})\s*$",  # All-caps line near top
-    "bill_number": r"bill\s*number[:\s]+([A-Z0-9/\-.]+)",
+    "bill_number": r"bill\s*(?:number|no\.?)[:\s]+([A-Z0-9/\-.]+)",
     "bill_date": r"bill\s*date[:\s]+([0-9]{1,2}[/\-][0-9]{1,2}[/\-][0-9]{2,4})",
     "patient_name": r"patient\s*name[:\s]+([A-Z][A-Za-z\s.]+?)(?:\s+Age[/\s]|$)",
     "patient_id": r"patient\s*id[:\s]+([A-Z0-9\-/]+)",
@@ -86,12 +86,15 @@ def extract_header_fields(text: str) -> dict[str, Optional[str]]:
         else:
             header[field] = None
     
-    # Hospital name: take first all-caps line >5 chars
+    # Hospital name: take first line with "hospital" (case-insensitive) in first 10 lines
     if not header.get("hospital_name"):
         for line in text.split("\n")[:10]:
             stripped = line.strip()
-            if len(stripped) > 5 and stripped.isupper() and "HOSPITAL" in stripped:
-                header["hospital_name"] = stripped
+            # Match lines with "hospital" OR "clinic" OR "healthcare" that are >5 chars
+            if len(stripped) > 5 and re.search(r"\b(hospital|clinic|healthcare|medical center)\b", stripped, re.IGNORECASE):
+                # Clean up: remove extra spaces, keep titlecase or uppercase
+                cleaned = re.sub(r"\s+", " ", stripped)
+                header["hospital_name"] = cleaned
                 break
     
     # Parse age/sex if captured together
