@@ -172,3 +172,5 @@ zstandard==0.25.0
 groq
 pdf2image
 anthropic
+PyPDF2==3.0.1
+pypdfium2==4.30.0

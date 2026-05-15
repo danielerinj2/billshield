@@ -126,14 +126,12 @@ def parse_document(temp_file_path: str, doc_type: str, is_image: bool):
     2. Standard vision LLM (Anthropic/OpenAI)
     3. Groq vision (final fallback for difficult scans)
     """
-    # Multi-bill detection (Phase 1.7)
+    # Multi-bill detection and handling (Phase 1.7 Option B)
     if doc_type == 'bill' and not is_image:
         multi_check = detect_multi_bill(temp_file_path)
         if multi_check["is_multi"]:
-            raise ValueError(
-                f"Multi-bill PDF detected: found {multi_check['distinct_bills']} separate bills "
-                f"across {multi_check['page_count']} pages. Please upload each bill separately."
-            )
+            print(f"📚 Multi-bill PDF detected: {multi_check['distinct_bills']} bills")
+            return parse_multi_bill_pdf(temp_file_path)
     
     if doc_type == 'bill':
         if is_image:
@@ -236,6 +234,364 @@ def parse_document(temp_file_path: str, doc_type: str, is_image: bool):
 
 
 @router.post("/analysis/run/{analysis_id}")
+
+
+def aggregate_bills(bills_data: list) -> dict:
+    """
+    Combine multiple parsed bills into a single aggregated result.
+    
+    Args:
+        bills_data: List of parsed bill dictionaries
+    
+    Returns:
+        Single aggregated bill dict with combined line_items
+    """
+    if not bills_data:
+        raise ValueError("No bills to aggregate")
+    
+    if len(bills_data) == 1:
+        return bills_data[0]
+    
+    # Aggregate line items from all bills
+    all_line_items = []
+    for idx, bill in enumerate(bills_data, 1):
+        items = bill.get('line_items', [])
+        # Tag each item with source bill number
+        for item in items:
+            item['source_bill'] = idx
+        all_line_items.extend(items)
+    
+    # Sum totals
+    total_amount = sum(bill.get('total_amount', 0) for bill in bills_data)
+    
+    # Use first bill's metadata as base, update with aggregated data
+    aggregated = bills_data[0].copy()
+    aggregated.update({
+        'line_items': all_line_items,
+        'total_amount': total_amount,
+        'bill_number': ', '.join(
+            str(bill.get('bill_number', '?')) 
+            for bill in bills_data
+        ),
+        'bill_date': min(
+            (bill.get('bill_date') for bill in bills_data if bill.get('bill_date')),
+            default=bills_data[0].get('bill_date')
+        ),
+        'multi_bill_count': len(bills_data),
+    })
+    
+    return aggregated
+
+
+def parse_multi_bill_pdf(pdf_path: str) -> dict:
+    """
+    Parse a multi-bill PDF by splitting it and parsing each bill separately.
+    
+    Returns:
+        Aggregated bill data dict
+    """
+    from src.scripts.pdf_splitter import split_pdf_by_bills
+    
+    # Split PDF
+    split_result = split_pdf_by_bills(pdf_path)
+    
+    if not split_result['success']:
+        raise ValueError(split_result['error'])
+    
+    bill_pdfs = split_result['bill_pdfs']
+    bill_count = len(bill_pdfs)
+    
+    print(f"📚 Parsing {bill_count} bills (split via TIER {split_result['tier_used']})...")
+    
+    # Parse each bill
+    parsed_bills = []
+    failed_bills = []
+    
+    for idx, bill_pdf_path in enumerate(bill_pdfs, 1):
+        try:
+            print(f"🔍 Parsing bill {idx}/{bill_count}...")
+            
+            # Recursively call parse_document for each bill
+            # This runs the 3-tier parser (regex -> vision -> groq) on each
+            bill_data = parse_document_single_bill(bill_pdf_path, is_image=False)
+            parsed_bills.append(bill_data)
+            
+        except Exception as e:
+            print(f"⚠️ Bill {idx} failed to parse: {e}")
+            failed_bills.append(idx)
+            continue
+    
+    # Check partial success
+    if not parsed_bills:
+        raise ValueError(f"All {bill_count} bills failed to parse")
+    
+    if failed_bills:
+        print(f"⚠️ WARNING: {len(failed_bills)} of {bill_count} bills failed to parse")
+        print(f"⚠️ Failed bill numbers: {failed_bills}")
+        print(f"✅ Successfully parsed {len(parsed_bills)} bills")
+    
+    # Aggregate results
+    aggregated = aggregate_bills(parsed_bills)
+    
+    # Add warning if partial failure
+    if failed_bills:
+        aggregated['parsing_warning'] = (
+            f"Warning: {len(failed_bills)} of {bill_count} bills could not be parsed. "
+            f"Results shown are for {len(parsed_bills)} successfully parsed bills only."
+        )
+    
+    return aggregated
+
+
+def parse_document_single_bill(temp_file_path: str, is_image: bool):
+    """
+    Parse a single bill PDF (extracted logic from parse_document).
+    This is the existing TIER 1/2/3 logic, just without multi-bill handling.
+    """
+    if is_image:
+        print("📸 Image file - using vision LLM...")
+        return parse_pdf_with_vision(temp_file_path, doc_type='bill')
+    
+    # TIER 1: Try regex parser first for PDFs
+    try:
+        print("🔍 TIER 1: Attempting regex parser...")
+        data = parse_bill_pdf(temp_file_path)
+        line_count = len(data.get('line_items', []))
+        
+        # Quality check
+        has_amounts = any(
+            item.get('amount', 0) > 0 
+            for item in data.get('line_items', [])
+        )
+        has_descriptions = any(
+            len(item.get('description', '').strip()) > 3
+            for item in data.get('line_items', [])
+        )
+        
+        if line_count == 0 or not (has_amounts and has_descriptions):
+            print(f"⚠️ Regex returned low-quality data")
+            raise ValueError("Regex quality check failed")
+        
+        print(f"✅ TIER 1 SUCCESS: Regex parser extracted {line_count} items")
+        return data
+        
+    except Exception as regex_error:
+        print(f"⚠️ TIER 1 FAILED: {regex_error}")
+        
+        # TIER 2: Try standard vision LLM
+        try:
+            print("🔍 TIER 2: Attempting standard vision LLM...")
+            data = parse_pdf_with_vision(temp_file_path, doc_type='bill')
+            line_count = len(data.get('line_items', []))
+            
+            if line_count > 0:
+                print(f"✅ TIER 2 SUCCESS: Vision LLM extracted {line_count} items")
+                return data
+            else:
+                raise ValueError("Vision LLM returned 0 items")
+                
+        except Exception as vision_error:
+            print(f"⚠️ TIER 2 FAILED: {vision_error}")
+            
+            # TIER 3: Final fallback to Groq
+            try:
+                print("🔍 TIER 3: Attempting Groq vision...")
+                from src.scripts.groq_vision_parser import parse_with_groq_vision
+                
+                data = parse_with_groq_vision(temp_file_path, doc_type='bill')
+                line_count = len(data.get('line_items', []))
+                
+                if line_count > 0:
+                    print(f"✅ TIER 3 SUCCESS: Groq extracted {line_count} items")
+                    return data
+                else:
+                    raise ValueError("Groq returned 0 items")
+                    
+            except Exception as groq_error:
+                print(f"⚠️ TIER 3 FAILED: {groq_error}")
+                raise ValueError("All parsing tiers failed")
+
+
+
+
+
+def aggregate_bills(bills_data: list) -> dict:
+    """
+    Combine multiple parsed bills into a single aggregated result.
+    
+    Args:
+        bills_data: List of parsed bill dictionaries
+    
+    Returns:
+        Single aggregated bill dict with combined line_items
+    """
+    if not bills_data:
+        raise ValueError("No bills to aggregate")
+    
+    if len(bills_data) == 1:
+        return bills_data[0]
+    
+    # Aggregate line items from all bills
+    all_line_items = []
+    for idx, bill in enumerate(bills_data, 1):
+        items = bill.get('line_items', [])
+        # Tag each item with source bill number
+        for item in items:
+            item['source_bill'] = idx
+        all_line_items.extend(items)
+    
+    # Sum totals
+    total_amount = sum(bill.get('total_amount', 0) for bill in bills_data)
+    
+    # Use first bill's metadata as base, update with aggregated data
+    aggregated = bills_data[0].copy()
+    aggregated.update({
+        'line_items': all_line_items,
+        'total_amount': total_amount,
+        'bill_number': ', '.join(
+            str(bill.get('bill_number', '?')) 
+            for bill in bills_data
+        ),
+        'bill_date': min(
+            (bill.get('bill_date') for bill in bills_data if bill.get('bill_date')),
+            default=bills_data[0].get('bill_date')
+        ),
+        'multi_bill_count': len(bills_data),
+    })
+    
+    return aggregated
+
+
+def parse_multi_bill_pdf(pdf_path: str) -> dict:
+    """
+    Parse a multi-bill PDF by splitting it and parsing each bill separately.
+    
+    Returns:
+        Aggregated bill data dict
+    """
+    from src.scripts.pdf_splitter import split_pdf_by_bills
+    
+    # Split PDF
+    split_result = split_pdf_by_bills(pdf_path)
+    
+    if not split_result['success']:
+        raise ValueError(split_result['error'])
+    
+    bill_pdfs = split_result['bill_pdfs']
+    bill_count = len(bill_pdfs)
+    
+    print(f"📚 Parsing {bill_count} bills (split via TIER {split_result['tier_used']})...")
+    
+    # Parse each bill
+    parsed_bills = []
+    failed_bills = []
+    
+    for idx, bill_pdf_path in enumerate(bill_pdfs, 1):
+        try:
+            print(f"🔍 Parsing bill {idx}/{bill_count}...")
+            
+            # Recursively call parse_document for each bill
+            # This runs the 3-tier parser (regex -> vision -> groq) on each
+            bill_data = parse_document_single_bill(bill_pdf_path, is_image=False)
+            parsed_bills.append(bill_data)
+            
+        except Exception as e:
+            print(f"⚠️ Bill {idx} failed to parse: {e}")
+            failed_bills.append(idx)
+            continue
+    
+    # Check partial success
+    if not parsed_bills:
+        raise ValueError(f"All {bill_count} bills failed to parse")
+    
+    if failed_bills:
+        print(f"⚠️ WARNING: {len(failed_bills)} of {bill_count} bills failed to parse")
+        print(f"⚠️ Failed bill numbers: {failed_bills}")
+        print(f"✅ Successfully parsed {len(parsed_bills)} bills")
+    
+    # Aggregate results
+    aggregated = aggregate_bills(parsed_bills)
+    
+    # Add warning if partial failure
+    if failed_bills:
+        aggregated['parsing_warning'] = (
+            f"Warning: {len(failed_bills)} of {bill_count} bills could not be parsed. "
+            f"Results shown are for {len(parsed_bills)} successfully parsed bills only."
+        )
+    
+    return aggregated
+
+
+def parse_document_single_bill(temp_file_path: str, is_image: bool):
+    """
+    Parse a single bill PDF (extracted logic from parse_document).
+    This is the existing TIER 1/2/3 logic, just without multi-bill handling.
+    """
+    if is_image:
+        print("📸 Image file - using vision LLM...")
+        return parse_pdf_with_vision(temp_file_path, doc_type='bill')
+    
+    # TIER 1: Try regex parser first for PDFs
+    try:
+        print("🔍 TIER 1: Attempting regex parser...")
+        data = parse_bill_pdf(temp_file_path)
+        line_count = len(data.get('line_items', []))
+        
+        # Quality check
+        has_amounts = any(
+            item.get('amount', 0) > 0 
+            for item in data.get('line_items', [])
+        )
+        has_descriptions = any(
+            len(item.get('description', '').strip()) > 3
+            for item in data.get('line_items', [])
+        )
+        
+        if line_count == 0 or not (has_amounts and has_descriptions):
+            print(f"⚠️ Regex returned low-quality data")
+            raise ValueError("Regex quality check failed")
+        
+        print(f"✅ TIER 1 SUCCESS: Regex parser extracted {line_count} items")
+        return data
+        
+    except Exception as regex_error:
+        print(f"⚠️ TIER 1 FAILED: {regex_error}")
+        
+        # TIER 2: Try standard vision LLM
+        try:
+            print("🔍 TIER 2: Attempting standard vision LLM...")
+            data = parse_pdf_with_vision(temp_file_path, doc_type='bill')
+            line_count = len(data.get('line_items', []))
+            
+            if line_count > 0:
+                print(f"✅ TIER 2 SUCCESS: Vision LLM extracted {line_count} items")
+                return data
+            else:
+                raise ValueError("Vision LLM returned 0 items")
+                
+        except Exception as vision_error:
+            print(f"⚠️ TIER 2 FAILED: {vision_error}")
+            
+            # TIER 3: Final fallback to Groq
+            try:
+                print("🔍 TIER 3: Attempting Groq vision...")
+                from src.scripts.groq_vision_parser import parse_with_groq_vision
+                
+                data = parse_with_groq_vision(temp_file_path, doc_type='bill')
+                line_count = len(data.get('line_items', []))
+                
+                if line_count > 0:
+                    print(f"✅ TIER 3 SUCCESS: Groq extracted {line_count} items")
+                    return data
+                else:
+                    raise ValueError("Groq returned 0 items")
+                    
+            except Exception as groq_error:
+                print(f"⚠️ TIER 3 FAILED: {groq_error}")
+                raise ValueError("All parsing tiers failed")
+
+
+
 async def run_analysis(
     analysis_id: str,
     db: Client = Depends(get_db)
