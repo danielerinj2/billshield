@@ -279,7 +279,17 @@ async def run_analysis(
                 
                 # Parse using the helper function
                 print(f"🔍 Parsing {doc['doc_type']} ({file_extension})...")
-                parsed_data = parse_document(temp_file_path, doc['doc_type'], is_image)
+                try:
+                    parsed_data = parse_document(temp_file_path, doc['doc_type'], is_image)
+                except ValueError as ve:
+                    # Multi-bill PDF or other validation error
+                    error_msg = str(ve)
+                    if "Multi-bill PDF detected" in error_msg:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=error_msg
+                        )
+                    raise  # Re-raise other ValueErrors
                 
                 # Store parsed data
                 if doc['doc_type'] == 'bill':
