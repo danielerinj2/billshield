@@ -165,7 +165,18 @@ def _lab_item_ratio(line_items: List[Dict]) -> float:
     lab_keywords = [
         "test", "scan", "ray", "mri", "ct", "ultrasound", "usg",
         "cbc", "lft", "kft", "rft", "blood", "urine", "culture",
-        "biopsy", "pathology", "specimen", "sample"
+        "biopsy", "pathology", "specimen", "sample",
+        # Common lab test names (added for better classification)
+        "hemoglobin", "glucose", "protein", "bilirubin", "creatinine",
+        "sgpt", "sgot", "alkaline", "ast", "alt", "ggt",
+        "tsh", "thyroid", "lipid", "cholesterol", "triglyceride",
+        "sodium", "potassium", "calcium", "phosphate", "magnesium",
+        "platelet", "rbc", "wbc", "haemoglobin", "hematology",
+        "cardiac", "troponin", "crp", "esr", "vdrl", "hiv",
+        "albumin", "globulin", "prothrombin", "clotting",
+        "urinalysis", "urine examination", "ketone", "leucocyte",
+        "epithelial", "bacteria", "cast", "crystal", "eosinophil",
+        "neutrophil", "lymphocyte", "monocyte", "basophil"
     ]
     
     lab_count = sum(
