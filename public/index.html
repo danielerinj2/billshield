@@ -2113,7 +2113,147 @@ function displayResults(results) {
     console.log('📋 Issues:', issues);
     console.log(`✅ Rendered — docType=${docType}, issues=${issueCount}, overcharge=₹${overchargeAmount}`);
 }
-
+window.handleLetters = async function(event) {
+    event.preventDefault();
+    
+    // Collect form data
+    const formData = {
+        patient_name: document.getElementById('lettersPatientName')?.value || '',
+        hospital_name: document.getElementById('hospitalName')?.value || '',
+        bill_number: document.getElementById('billNumber')?.value || '',
+        insurer_name: document.getElementById('insurerName')?.value || '',
+        policy_number: document.getElementById('policyNumber')?.value || '',
+        claim_number: document.getElementById('claimNumber')?.value || '',
+        tone: selectedTone || 'professional',
+        analysis_id: window.currentAnalysisId || null
+    };
+    
+    // Validation
+    if (!formData.hospital_name || !formData.bill_number) {
+        alert('Please fill in Hospital Name and Bill Number to generate letters.');
+        return;
+    }
+    
+    if (!formData.analysis_id) {
+        alert('No analysis found. Please upload a bill first.');
+        return;
+    }
+    
+    console.log('📝 Generating letters with:', formData);
+    
+    // Show loading state
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Generating letters...';
+    submitBtn.disabled = true;
+    
+    try {
+        const response = await fetch(`${API_URL}/api/letters/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Letter generation failed:', response.status, errorText);
+            
+            if (response.status === 404) {
+                alert('Letter generation endpoint not built yet. The form data has been captured (see console). This feature is coming soon.');
+            } else {
+                alert(`Letter generation failed: ${response.status}. Check console for details.`);
+            }
+            return;
+        }
+        
+        const data = await response.json();
+        console.log('✅ Letters generated:', data);
+        
+        // Store letters for download page
+        window.generatedLetters = data;
+        
+        // Move to download page
+        document.getElementById('letters').classList.remove('active');
+        document.getElementById('download').classList.add('active');
+        
+    } catch (error) {
+        console.error('Letter generation error:', error);
+        alert('Failed to generate letters: ' + error.message);
+    } finally {
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+    }
+};
+window.handleLetters = async function(event) {
+    event.preventDefault();
+    
+    // Collect form data
+    const patientName = document.getElementById('lettersPatientName')?.value?.trim() || '';
+    const hospitalName = document.getElementById('hospitalName')?.value?.trim() || '';
+    const insurerName = document.getElementById('insurerName')?.value?.trim() || '';
+    
+    // Validation
+    if (!patientName) {
+        alert('Please enter the patient name.');
+        return;
+    }
+    
+    if (!hospitalName) {
+        alert('Please enter the hospital name.');
+        return;
+    }
+    
+    if (!window.currentAnalysisId) {
+        alert('No analysis found. Please upload and analyze a bill first.');
+        return;
+    }
+    
+    console.log('📝 Generating letters...');
+    
+    // Show loading state
+    const submitBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Generating letters...';
+    submitBtn.disabled = true;
+    
+    try {
+        const response = await fetch(`${API_URL}/api/letters/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                analysis_id: window.currentAnalysisId,
+                tone: selectedTone || 'professional',
+                patient_name: patientName,
+                hospital_name: hospitalName,
+                insurer_name: insurerName || null
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Letter generation failed:', errorData);
+            alert(`Failed to generate letters: ${errorData.detail || 'Unknown error'}`);
+            return;
+        }
+        
+        const data = await response.json();
+        console.log('✅ Letters generated:', data);
+        
+        // Store letters for download page
+        window.generatedLetters = data.letters;
+        
+        // Move to download page
+        document.getElementById('letters').classList.remove('active');
+        document.getElementById('download').classList.add('active');
+        
+    } catch (error) {
+        console.error('Letter generation error:', error);
+        alert('Failed to generate letters. Please try again.');
+    } finally {
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+    }
+};
 console.log('✅ BillShield API Integration Loaded');
 console.log('🔗 Backend URL:', API_URL);
 </script>
