@@ -40,7 +40,7 @@ class LabAnalyzer:
             total_patient_liability=total_bill,
             total_verified_overcharge=verified_overcharge,
             total_unverified_charges=0.0,
-            estimated_recoverable={"low": verified_overcharge * 0.5, "high": verified_overcharge},
+            estimated_recoverable={"min": verified_overcharge * 0.5, "max": verified_overcharge},
             issues=issues,
             summary=f"Analyzed {len(line_items)} lab tests, found {len(issues)} issues.",
             recommendations=[
