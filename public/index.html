@@ -6,7 +6,8 @@
     <title>BillShield - Stop Paying More Than You Should on Hospital Bills</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist+Sans:wght@400;500;600;700;900&family=Geist+Mono:wght@400;600&display=swap" rel="stylesheet">
+    
     <style>
         * {
             margin: 0;
@@ -29,12 +30,141 @@
         }
 
         body {
-            font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+            font-family: 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 16px;
+            font-weight: 400;
             background: var(--bg);
             color: var(--text);
             line-height: 1.6;
             overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
+
+        /* ========================================
+           TYPOGRAPHY HIERARCHY
+           ======================================== */
+
+        /* Headings base */
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Geist Sans', sans-serif;
+            font-weight: 600;
+            line-height: 1.2;
+            margin: 0;
+            letter-spacing: -0.02em;
+        }
+
+        /* Display/Hero - Used for landing page main headline */
+        .hero-content h1 {
+            font-size: 3.5rem; /* 56px */
+            font-weight: 700;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+        }
+
+        /* H1 - Page titles, major sections */
+        h1 {
+            font-size: 3rem; /* 48px */
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        /* H2 - Section headlines */
+        h2 {
+            font-size: 2rem; /* 32px */
+            font-weight: 600;
+        }
+
+        /* H3 - Subsection headlines */
+        h3 {
+            font-size: 1.5rem; /* 24px */
+            font-weight: 600;
+        }
+
+        /* H4 - Card titles, smaller sections */
+        h4 {
+            font-size: 1.125rem; /* 18px */
+            font-weight: 500;
+        }
+
+        /* H5, H6 - Minor headlines */
+        h5, h6 {
+            font-size: 1rem; /* 16px */
+            font-weight: 500;
+        }
+
+        /* Body text */
+        p {
+            font-size: 1rem; /* 16px */
+            font-weight: 400;
+            line-height: 1.6;
+            margin: 0 0 1rem;
+        }
+
+        /* Small text - captions, metadata */
+        small, .small-text {
+            font-size: 0.875rem; /* 14px */
+            font-weight: 400;
+            line-height: 1.5;
+        }
+
+        /* UI Elements - buttons, nav, labels */
+        button, .btn {
+            font-family: 'Geist Sans', sans-serif;
+            font-size: 1rem;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+        }
+
+        label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+        }
+
+        input, textarea, select {
+            font-family: 'Geist Sans', sans-serif;
+            font-size: 1rem;
+            font-weight: 400;
+        }
+
+        /* Code/Monospace - for technical content, numbers */
+        code, pre, .monospace {
+            font-family: 'Geist Mono', 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            font-weight: 400;
+        }
+
+        .summary-value {
+            font-family: 'Geist Mono', monospace;
+            font-size: 2rem;
+            font-weight: 600;
+        }
+
+        /* Mobile responsive typography */
+        @media (max-width: 768px) {
+            .hero-content h1 {
+                font-size: 2.5rem; /* 40px on mobile */
+            }
+            
+            h1 {
+                font-size: 2rem; /* 32px on mobile */
+            }
+            
+            h2 {
+                font-size: 1.5rem; /* 24px on mobile */
+            }
+            
+            h3 {
+                font-size: 1.25rem; /* 20px on mobile */
+            }
+            
+            .summary-value {
+                font-size: 1.5rem;
+            }
+        }
+
+        /* [REST OF YOUR EXISTING CSS CONTINUES HERE...] */
 
         .page {
             display: none;
@@ -74,7 +204,7 @@
             font-size: 1.5rem;
             font-weight: 700;
             color: var(--primary);
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'Geist Sans', sans-serif;
             letter-spacing: -0.02em;
         }
 
@@ -562,7 +692,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'Geist Sans', sans-serif;
+            font-weight: 500;
         }
 
         /* Results Page */
