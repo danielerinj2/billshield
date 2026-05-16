@@ -121,30 +121,21 @@ async def upload_document(
 
 def parse_document(temp_file_path: str, doc_type: str, is_image: bool):
     """
-    Parse a document using 3-tier fallback system:
-    1. Regex parser (fast, cheap)
-    2. Standard vision LLM (Anthropic/OpenAI)
-    3. Groq vision (final fallback for difficult scans)
+    Parse a document using the appropriate parser.
+    Falls back to vision LLM for images or when regex fails.
     """
-    # Multi-bill detection and handling (Phase 1.7 Option B)
-    if doc_type == 'bill' and not is_image:
-        multi_check = detect_multi_bill(temp_file_path)
-        if multi_check["is_multi"]:
-            print(f"📚 Multi-bill PDF detected: {multi_check['distinct_bills']} bills")
-            return parse_multi_bill_pdf(temp_file_path)
-    
     if doc_type == 'bill':
         if is_image:
             print("📸 Image file - using vision LLM...")
             return parse_pdf_with_vision(temp_file_path, doc_type='bill')
         
-        # TIER 1: Try regex parser first for PDFs
+        # Try regex parser first for PDFs
         try:
             print("🔍 TIER 1: Attempting regex parser...")
             data = parse_bill_pdf(temp_file_path)
             line_count = len(data.get('line_items', []))
             
-            # Quality check: Verify we got meaningful data
+            # QUALITY CHECK: Verify we got meaningful data
             has_amounts = any(
                 item.get('amount', 0) > 0 
                 for item in data.get('line_items', [])
@@ -155,7 +146,7 @@ def parse_document(temp_file_path: str, doc_type: str, is_image: bool):
             )
             
             if line_count == 0 or not (has_amounts and has_descriptions):
-                print(f"⚠️ Regex returned low-quality data (items={line_count}, has_amounts={has_amounts}, has_descriptions={has_descriptions})")
+                print(f"⚠️ Regex returned low-quality data")
                 raise ValueError("Regex quality check failed")
             
             print(f"✅ TIER 1 SUCCESS: Regex parser extracted {line_count} items")
@@ -181,54 +172,51 @@ def parse_document(temp_file_path: str, doc_type: str, is_image: bool):
                 
                 # TIER 3: Final fallback to Groq
                 try:
-                    print("🔍 TIER 3: Attempting Groq vision (final fallback)...")
+                    print("🔍 TIER 3: Attempting Groq vision...")
                     from src.scripts.groq_vision_parser import parse_with_groq_vision
                     
                     data = parse_with_groq_vision(temp_file_path, doc_type='bill')
                     line_count = len(data.get('line_items', []))
                     
                     if line_count > 0:
-                        print(f"✅ TIER 3 SUCCESS: Groq vision extracted {line_count} items")
+                        print(f"✅ TIER 3 SUCCESS: Groq extracted {line_count} items")
                         return data
                     else:
-                        raise ValueError("All parsers failed")
+                        raise ValueError("Groq returned 0 items")
                         
                 except Exception as groq_error:
-                    print(f"❌ TIER 3 FAILED: {groq_error}")
-                    print("❌ ALL PARSING TIERS EXHAUSTED")
-                    raise ValueError(f"All parsers failed: Regex={regex_error}, Vision={vision_error}, Groq={groq_error}")
+                    print(f"⚠️ TIER 3 FAILED: {groq_error}")
+                    raise ValueError("All parsing tiers failed")
     
     elif doc_type == 'discharge':
         if is_image:
+            print("📸 Image file - using vision LLM...")
             return parse_pdf_with_vision(temp_file_path, doc_type='discharge')
         
         try:
             data = parse_discharge_pdf(temp_file_path)
             if not data.get('patient_info', {}).get('name'):
-                raise ValueError("Discharge regex quality check failed")
-            return data
-        except Exception as e1:
-            try:
+                print("⚠️ Regex returned empty data, falling back to vision LLM...")
                 return parse_pdf_with_vision(temp_file_path, doc_type='discharge')
-            except Exception as e2:
-                from src.scripts.groq_vision_parser import parse_with_groq_vision
-                return parse_with_groq_vision(temp_file_path, doc_type='discharge')
+            return data
+        except Exception as e:
+            print(f"⚠️ Regex parser failed: {e}, trying vision LLM...")
+            return parse_pdf_with_vision(temp_file_path, doc_type='discharge')
     
     elif doc_type == 'rejection':
         if is_image:
+            print("📸 Image file - using vision LLM...")
             return parse_pdf_with_vision(temp_file_path, doc_type='rejection')
         
         try:
             data = parse_rejection_pdf(temp_file_path)
             if not data.get('claim_metadata', {}).get('claim_number'):
-                raise ValueError("Rejection regex quality check failed")
-            return data
-        except Exception as e1:
-            try:
+                print("⚠️ Regex returned empty data, falling back to vision LLM...")
                 return parse_pdf_with_vision(temp_file_path, doc_type='rejection')
-            except Exception as e2:
-                from src.scripts.groq_vision_parser import parse_with_groq_vision
-                return parse_with_groq_vision(temp_file_path, doc_type='rejection')
+            return data
+        except Exception as e:
+            print(f"⚠️ Regex parser failed: {e}, trying vision LLM...")
+            return parse_pdf_with_vision(temp_file_path, doc_type='rejection')
     
     return None
 
@@ -277,17 +265,7 @@ async def run_analysis(
                 
                 # Parse using the helper function
                 print(f"🔍 Parsing {doc['doc_type']} ({file_extension})...")
-                try:
-                    parsed_data = parse_document(temp_file_path, doc['doc_type'], is_image)
-                except ValueError as ve:
-                    # Multi-bill PDF or other validation error
-                    error_msg = str(ve)
-                    if "Multi-bill PDF detected" in error_msg:
-                        raise HTTPException(
-                            status_code=400,
-                            detail=error_msg
-                        )
-                    raise  # Re-raise other ValueErrors
+                parsed_data = parse_document(temp_file_path, doc['doc_type'], is_image)
                 
                 # Store parsed data
                 if doc['doc_type'] == 'bill':
@@ -300,9 +278,6 @@ async def run_analysis(
                     rejection_data = parsed_data
                     print("✓ Rejection parsed")
                     
-            except HTTPException:
-                # Let HTTPException (like multi-bill errors) pass through
-                raise
             except Exception as parse_error:
                 print(f"❌ Error parsing {doc['doc_type']}: {str(parse_error)}")
                 import traceback
@@ -322,7 +297,6 @@ async def run_analysis(
         print(f"   Discharge: {'✓' if discharge_data else '✗'}")
         print(f"   Rejection: {'✓' if rejection_data else '✗'}")
         
-        # DEBUG: Show what vision parser returned BEFORE agent runs
         print("="*80)
         print("🔍 DEBUG: VISION PARSER OUTPUT")
         print("="*80)
@@ -400,9 +374,6 @@ async def run_analysis(
             "verified_overcharge": result.total_verified_overcharge
         }
     
-    except HTTPException:
-        # Let HTTPException (400 errors like multi-bill) pass through
-        raise
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
@@ -417,194 +388,6 @@ async def run_analysis(
             pass
         
         raise HTTPException(status_code=500, detail=f"Failed to run analysis: {str(e)}")
-
-
-
-
-
-
-
-
-
-def aggregate_bills(bills_data: list) -> dict:
-    """
-    Combine multiple parsed bills into a single aggregated result.
-    
-    Args:
-        bills_data: List of parsed bill dictionaries
-    
-    Returns:
-        Single aggregated bill dict with combined line_items
-    """
-    if not bills_data:
-        raise ValueError("No bills to aggregate")
-    
-    if len(bills_data) == 1:
-        return bills_data[0]
-    
-    # Aggregate line items from all bills
-    all_line_items = []
-    for idx, bill in enumerate(bills_data, 1):
-        items = bill.get('line_items', [])
-        # Tag each item with source bill number
-        for item in items:
-            item['source_bill'] = idx
-        all_line_items.extend(items)
-    
-    # Sum totals
-    total_amount = sum(bill.get('total_amount', 0) for bill in bills_data)
-    
-    # Use first bill's metadata as base, update with aggregated data
-    aggregated = bills_data[0].copy()
-    aggregated.update({
-        'line_items': all_line_items,
-        'total_amount': total_amount,
-        'bill_number': ', '.join(
-            str(bill.get('bill_number', '?')) 
-            for bill in bills_data
-        ),
-        'bill_date': min(
-            (bill.get('bill_date') for bill in bills_data if bill.get('bill_date')),
-            default=bills_data[0].get('bill_date')
-        ),
-        'multi_bill_count': len(bills_data),
-    })
-    
-    return aggregated
-
-
-def parse_multi_bill_pdf(pdf_path: str) -> dict:
-    """
-    Parse a multi-bill PDF by splitting it and parsing each bill separately.
-    
-    Returns:
-        Aggregated bill data dict
-    """
-    from src.scripts.pdf_splitter import split_pdf_by_bills
-    
-    # Split PDF
-    split_result = split_pdf_by_bills(pdf_path)
-    
-    if not split_result['success']:
-        raise ValueError(split_result['error'])
-    
-    bill_pdfs = split_result['bill_pdfs']
-    bill_count = len(bill_pdfs)
-    
-    print(f"📚 Parsing {bill_count} bills (split via TIER {split_result['tier_used']})...")
-    
-    # Parse each bill
-    parsed_bills = []
-    failed_bills = []
-    
-    for idx, bill_pdf_path in enumerate(bill_pdfs, 1):
-        try:
-            print(f"🔍 Parsing bill {idx}/{bill_count}...")
-            
-            # Recursively call parse_document for each bill
-            # This runs the 3-tier parser (regex -> vision -> groq) on each
-            bill_data = parse_document_single_bill(bill_pdf_path, is_image=False)
-            parsed_bills.append(bill_data)
-            
-        except Exception as e:
-            print(f"⚠️ Bill {idx} failed to parse: {e}")
-            failed_bills.append(idx)
-            continue
-    
-    # Check partial success
-    if not parsed_bills:
-        raise ValueError(f"All {bill_count} bills failed to parse")
-    
-    if failed_bills:
-        print(f"⚠️ WARNING: {len(failed_bills)} of {bill_count} bills failed to parse")
-        print(f"⚠️ Failed bill numbers: {failed_bills}")
-        print(f"✅ Successfully parsed {len(parsed_bills)} bills")
-    
-    # Aggregate results
-    aggregated = aggregate_bills(parsed_bills)
-    
-    # Add warning if partial failure
-    if failed_bills:
-        aggregated['parsing_warning'] = (
-            f"Warning: {len(failed_bills)} of {bill_count} bills could not be parsed. "
-            f"Results shown are for {len(parsed_bills)} successfully parsed bills only."
-        )
-    
-    return aggregated
-
-
-def parse_document_single_bill(temp_file_path: str, is_image: bool):
-    """
-    Parse a single bill PDF (extracted logic from parse_document).
-    This is the existing TIER 1/2/3 logic, just without multi-bill handling.
-    """
-    if is_image:
-        print("📸 Image file - using vision LLM...")
-        return parse_pdf_with_vision(temp_file_path, doc_type='bill')
-    
-    # TIER 1: Try regex parser first for PDFs
-    try:
-        print("🔍 TIER 1: Attempting regex parser...")
-        data = parse_bill_pdf(temp_file_path)
-        line_count = len(data.get('line_items', []))
-        
-        # Quality check
-        has_amounts = any(
-            item.get('amount', 0) > 0 
-            for item in data.get('line_items', [])
-        )
-        has_descriptions = any(
-            len(item.get('description', '').strip()) > 3
-            for item in data.get('line_items', [])
-        )
-        
-        if line_count == 0 or not (has_amounts and has_descriptions):
-            print(f"⚠️ Regex returned low-quality data")
-            raise ValueError("Regex quality check failed")
-        
-        print(f"✅ TIER 1 SUCCESS: Regex parser extracted {line_count} items")
-        return data
-        
-    except Exception as regex_error:
-        print(f"⚠️ TIER 1 FAILED: {regex_error}")
-        
-        # TIER 2: Try standard vision LLM
-        try:
-            print("🔍 TIER 2: Attempting standard vision LLM...")
-            data = parse_pdf_with_vision(temp_file_path, doc_type='bill')
-            line_count = len(data.get('line_items', []))
-            
-            if line_count > 0:
-                print(f"✅ TIER 2 SUCCESS: Vision LLM extracted {line_count} items")
-                return data
-            else:
-                raise ValueError("Vision LLM returned 0 items")
-                
-        except Exception as vision_error:
-            print(f"⚠️ TIER 2 FAILED: {vision_error}")
-            
-            # TIER 3: Final fallback to Groq
-            try:
-                print("🔍 TIER 3: Attempting Groq vision...")
-                from src.scripts.groq_vision_parser import parse_with_groq_vision
-                
-                data = parse_with_groq_vision(temp_file_path, doc_type='bill')
-                line_count = len(data.get('line_items', []))
-                
-                if line_count > 0:
-                    print(f"✅ TIER 3 SUCCESS: Groq extracted {line_count} items")
-                    return data
-                else:
-                    raise ValueError("Groq returned 0 items")
-                    
-            except Exception as groq_error:
-                print(f"⚠️ TIER 3 FAILED: {groq_error}")
-                raise ValueError("All parsing tiers failed")
-
-
-
-
-
 
 
 @router.get("/analysis/{analysis_id}")
@@ -657,13 +440,14 @@ async def generate_letters(
                 bill_number=analysis.data['raw_result'].get('bill_number', '[Bill Number]')
             )
             
-            db.table('letters').insert({
+            inserted = db.table('letters').insert({
                 'analysis_id': data.analysis_id,
                 'letter_type': f'hospital_{tone}',
                 'content': content
             }).execute()
             
             letters.append({
+                'id': inserted.data[0]['id'] if inserted.data else None,
                 'letter_type': f'hospital_{tone}',
                 'content': content
             })
@@ -677,13 +461,14 @@ async def generate_letters(
             claim_number=analysis.data['raw_result'].get('claim_number', '[Claim Number]')
         )
         
-        db.table('letters').insert({
+        inserted = db.table('letters').insert({
             'analysis_id': data.analysis_id,
             'letter_type': 'insurer',
             'content': insurer_letter
         }).execute()
         
         letters.append({
+            'id': inserted.data[0]['id'] if inserted.data else None,
             'letter_type': 'insurer',
             'content': insurer_letter
         })
@@ -693,13 +478,14 @@ async def generate_letters(
             patient_name=data.patient_name
         )
         
-        db.table('letters').insert({
+        inserted = db.table('letters').insert({
             'analysis_id': data.analysis_id,
             'letter_type': 'patient_summary',
             'content': patient_summary
         }).execute()
         
         letters.append({
+            'id': inserted.data[0]['id'] if inserted.data else None,
             'letter_type': 'patient_summary',
             'content': patient_summary
         })
@@ -728,3 +514,88 @@ async def get_letters(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch letters: {str(e)}")
+
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.enums import TA_LEFT
+from fastapi.responses import StreamingResponse
+from io import BytesIO
+
+
+@router.get("/letters/{letter_id}/pdf")
+async def download_letter_pdf(
+    letter_id: str,
+    db: Client = Depends(get_db)
+):
+    """Generate and download a letter as PDF."""
+    try:
+        # Fetch letter from DB
+        letter_result = db.table('letters').select('*').eq('id', letter_id).single().execute()
+        
+        if not letter_result.data:
+            raise HTTPException(status_code=404, detail="Letter not found")
+        
+        letter = letter_result.data
+        content = letter['content']
+        letter_type = letter['letter_type']
+        
+        # Generate PDF in memory
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            leftMargin=1*inch,
+            rightMargin=1*inch,
+            topMargin=1*inch,
+            bottomMargin=1*inch
+        )
+        
+        # Styling
+        styles = getSampleStyleSheet()
+        body_style = ParagraphStyle(
+            'CustomBody',
+            parent=styles['Normal'],
+            fontSize=11,
+            leading=16,
+            alignment=TA_LEFT,
+            spaceAfter=12
+        )
+        
+        # Convert content to PDF paragraphs (split by double newlines)
+        story = []
+        paragraphs = content.split('\n\n')
+        for para in paragraphs:
+            if para.strip():
+                # Replace single newlines with <br/> for line breaks within paragraphs
+                formatted = para.replace('\n', '<br/>').strip()
+                story.append(Paragraph(formatted, body_style))
+                story.append(Spacer(1, 0.1*inch))
+        
+        doc.build(story)
+        buffer.seek(0)
+        
+        # Friendly filename based on letter type
+        filename_map = {
+            'hospital_polite': 'Hospital_Letter_Polite.pdf',
+            'hospital_professional': 'Hospital_Letter_Professional.pdf',
+            'hospital_firm': 'Hospital_Letter_Firm.pdf',
+            'insurer': 'Insurer_Escalation_Letter.pdf',
+            'patient_summary': 'Patient_Action_Plan.pdf'
+        }
+        filename = filename_map.get(letter_type, f'Letter_{letter_type}.pdf')
+        
+        return StreamingResponse(
+            buffer,
+            media_type='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"'
+            }
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
