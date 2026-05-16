@@ -121,6 +121,10 @@ class PharmacyAnalyzer:
         """Check if drug exceeds NPPA ceiling price."""
         if not self.rag:
             return None
+        description = item.get("description", "")
+        amount = item.get("amount", 0)
+        qty = item.get("quantity", 1)
+
         
         description = item.get("description", "")
         amount = item.get("amount", 0)
@@ -129,6 +133,7 @@ class PharmacyAnalyzer:
         # NEW: Skip category-level summary items
         if self._is_category_summary_item(description):
             return None  # Don't try to match categories to NPPA
+        
         
         # Search NPPA database
         try:
