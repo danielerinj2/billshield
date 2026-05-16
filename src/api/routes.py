@@ -281,7 +281,7 @@ def parse_document(temp_file_path: str, doc_type: str, is_image: bool):
                 print(f"⚠️ Regex returned low-quality data (empty)")
                 raise ValueError("Regex quality check failed")
 
-            if garbage_count >= 3:  # If 3+ items are garbage
+            if garbage_count >= 2:  # If 2+ items are garbage
                 print(f"⚠️ Regex returned garbage OCR text ({garbage_count}/5 items)")
                 raise ValueError("Scanned PDF detected - need vision parser")
 
