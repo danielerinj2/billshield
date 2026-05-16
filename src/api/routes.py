@@ -263,11 +263,28 @@ def parse_document(temp_file_path: str, doc_type: str, is_image: bool):
                 len(item.get('description', '').strip()) > 3
                 for item in data.get('line_items', [])
             )
-            
+
+            # NEW: Check for garbage OCR (scanned PDFs)
+            line_items = data.get('line_items', [])
+            garbage_count = 0
+            for item in line_items[:5]:  # Check first 5 items
+                desc = item.get('description', '')
+                if len(desc) > 0:
+                    # Count non-letter characters (excluding spaces)
+                    non_letter_count = sum(1 for c in desc if not c.isalpha() and c != ' ')
+                    # If >40% of characters are garbage, flag it
+                    if non_letter_count / len(desc) > 0.4:
+                        garbage_count += 1
+                        print(f"⚠️ Garbage detected in: {desc[:50]}")
+
             if line_count == 0 or not (has_amounts and has_descriptions):
-                print(f"⚠️ Regex returned low-quality data")
+                print(f"⚠️ Regex returned low-quality data (empty)")
                 raise ValueError("Regex quality check failed")
-            
+
+            if garbage_count >= 3:  # If 3+ items are garbage
+                print(f"⚠️ Regex returned garbage OCR text ({garbage_count}/5 items)")
+                raise ValueError("Scanned PDF detected - need vision parser")
+
             print(f"✅ TIER 1 SUCCESS: Regex parser extracted {line_count} items")
             return data
             
