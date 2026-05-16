@@ -298,17 +298,17 @@ def parse_with_vision_llm(
 def parse_pdf_with_vision(
     pdf_path: str | Path,
     doc_type: str,
-    page_num: int = 0,
+    page_num: int = 0,  # DEPRECATED - now processes all pages
 ) -> dict[str, Any]:
     """Parse a PDF or image using vision-LLM.
     
     Args:
         pdf_path: Path to PDF or image file
         doc_type: "bill", "discharge", or "rejection"
-        page_num: Which page to extract (default: first page, ignored for images)
+        page_num: DEPRECATED - function now processes all pages automatically
     
     Returns:
-        Structured JSON dict
+        Structured JSON dict with aggregated data from all pages
     """
     from pdf2image import convert_from_path
     from PIL import Image
@@ -321,10 +321,61 @@ def parse_pdf_with_vision(
         image = Image.open(pdf_path)
         return parse_with_vision_llm(image, doc_type)
     
-    # It's a PDF - convert to image
-    images = convert_from_path(str(pdf_path), dpi=300, first_page=page_num+1, last_page=page_num+1)
+    # It's a PDF - convert ALL pages to images
+    print(f"Converting PDF to images (all pages)...")
+    images = convert_from_path(str(pdf_path), dpi=300)
     
     if not images:
-        raise ValueError(f"Could not extract page {page_num} from PDF")
+        raise ValueError(f"Could not extract any pages from PDF")
     
-    return parse_with_vision_llm(images[0], doc_type)
+    print(f"Processing {len(images)} pages...")
+    
+    # Process each page
+    all_results = []
+    for page_idx, image in enumerate(images, start=1):
+        print(f"  Processing page {page_idx}/{len(images)}...")
+        page_result = parse_with_vision_llm(image, doc_type)
+        all_results.append(page_result)
+    
+    # Aggregate results
+    if doc_type == "bill":
+        return _aggregate_bill_pages(all_results)
+    else:
+        # For discharge/rejection, just return the first page for now
+        # (multi-page aggregation for these types can be added later)
+        return all_results[0]
+
+
+def _aggregate_bill_pages(page_results: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate bill data from multiple pages.
+    
+    Strategy:
+    1. Take patient/hospital/bill metadata from page 1
+    2. Merge all line_items from all pages
+    3. Use the total_amount from page 1 (final page often has summary)
+       OR sum all line items if total is missing
+    """
+    if not page_results:
+        raise ValueError("No pages to aggregate")
+    
+    # Start with page 1 as base
+    aggregated = page_results[0].copy()
+    
+    # Collect all line items from all pages
+    all_line_items = []
+    for page in page_results:
+        if "line_items" in page and page["line_items"]:
+            all_line_items.extend(page["line_items"])
+    
+    aggregated["line_items"] = all_line_items
+    
+    # If total_amount is missing or 0, sum the line items
+    if not aggregated.get("total_amount") or aggregated["total_amount"] == 0:
+        aggregated["total_amount"] = sum(
+            item.get("amount", 0) for item in all_line_items
+        )
+    
+    print(f"Aggregated {len(all_line_items)} line items from {len(page_results)} pages")
+    print(f"Total amount: ₹{aggregated['total_amount']:,.2f}")
+    
+    return aggregated
