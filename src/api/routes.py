@@ -514,7 +514,8 @@ async def run_analysis(
             "issues_count": len(result.issues),
             "verified_overcharge": result.total_verified_overcharge
         }
-    
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
