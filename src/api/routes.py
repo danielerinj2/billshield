@@ -37,6 +37,117 @@ from src.scripts.vision_llm_parser import parse_pdf_with_vision
 
 router = APIRouter()
 
+# ============================================================
+# SCENARIO CLASSIFICATION + LETTER VALIDATION
+# ============================================================
+
+def classify_scenario(analysis_data: dict, user_input) -> str:
+    """Classify which letter set applies to this bill.
+    
+    Returns one of:
+        A_cash_clarification: No insurance, low-confidence issues only
+        B_cash_objection: No insurance, confirmed overcharges
+        C_insurance_dispute: Insurance involved, claim issues
+        D_hospital_overcharge_only: Insurance involved, only hospital overcharges
+    """
+    # Detect insurance involvement
+    has_policy = bool(getattr(user_input, 'policy_number', None) and str(user_input.policy_number).strip())
+    has_claim = bool(getattr(user_input, 'claim_number', None) and str(user_input.claim_number).strip())
+    has_insurer = bool(getattr(user_input, 'insurer_name', None) and str(user_input.insurer_name).strip())
+    has_approved = (analysis_data.get('total_approved', 0) or 0) > 0
+    has_rejected = (analysis_data.get('total_rejected', 0) or 0) > 0
+    
+    has_insurance = has_policy or has_claim or has_insurer or has_approved or has_rejected
+    
+    # Detect overcharges
+    verified_overcharge = analysis_data.get('total_verified_overcharge', 0) or 0
+    has_confirmed_overcharges = verified_overcharge > 0
+    
+    high_conf_issues = [
+        i for i in analysis_data.get('issues', [])
+        if i.get('confidence') == 'high'
+    ]
+    has_high_confidence_issues = len(high_conf_issues) > 0
+    
+    has_strong_evidence = has_confirmed_overcharges or has_high_confidence_issues
+    
+    # Detect claim rejection issues
+    rejection_issues = [
+        i for i in analysis_data.get('issues', [])
+        if i.get('issue_type') in ['rejection_invalid', 'rejection_delayed', 'policy_violation']
+    ]
+    has_claim_issues = len(rejection_issues) > 0 or has_rejected
+    
+    # Classify
+    if not has_insurance and not has_strong_evidence:
+        return "A_cash_clarification"
+    elif not has_insurance and has_strong_evidence:
+        return "B_cash_objection"
+    elif has_insurance and has_claim_issues:
+        return "C_insurance_dispute"
+    elif has_insurance and has_strong_evidence:
+        return "D_hospital_overcharge_only"
+    else:
+        # Insurance involved but no issues either way — default to clarification
+        return "A_cash_clarification"
+
+
+# Maps scenario -> which letters to generate
+LETTER_MATRIX = {
+    "A_cash_clarification": ["hospital_clarification", "patient_summary"],
+    "B_cash_objection": ["hospital_professional", "patient_summary"],
+    "C_insurance_dispute": ["hospital_professional", "insurer", "patient_summary"],
+    "D_hospital_overcharge_only": ["hospital_professional", "patient_summary"],
+}
+
+
+def validate_letter_content(content: str, scenario: str, analysis_data: dict) -> tuple:
+    """Validate letter doesn't contain contradictions or unfilled placeholders.
+    
+    Returns (is_valid, reason_if_invalid).
+    """
+    if not content or len(content.strip()) < 100:
+        return False, "Letter content too short"
+    
+    # Check 1: No unfilled bracket placeholders (case-insensitive)
+    bracket_placeholders = [
+        '[Hospital Name]', '[Patient Name]', '[Bill Number]',
+        '[Policy Number]', '[Claim Number]', '[Insurance Company]',
+        '[INSURER NAME]', '[HOSPITAL NAME]'
+    ]
+    for placeholder in bracket_placeholders:
+        if placeholder in content:
+            return False, f"Contains unfilled placeholder: {placeholder}"
+    
+    # Check 2: No encoding artifacts (n0, n63 instead of ₹)
+    import re
+    if re.search(r'\bn\d{1,7}\b(?!\w)', content):
+        return False, "Contains currency encoding artifact (n0, n63, etc.)"
+    
+    # Check 3: Scenario-specific contradictions
+    verified = analysis_data.get('total_verified_overcharge', 0) or 0
+    
+    if scenario == "A_cash_clarification":
+        # Should NOT contain confrontational overcharge language
+        forbidden = [
+            'overcharges detected',
+            'Overcharges Detected',
+            'demand refund',
+            'demand immediate',
+            'IRDAI violations',
+            'regulation violations'
+        ]
+        for word in forbidden:
+            if word.lower() in content.lower():
+                return False, f"Clarification letter contains confrontational language: '{word}'"
+    
+    # Check 4: If verified overcharge is 0, no "refund of Rs. 0" language
+    if verified == 0:
+        if 'Refund of ₹0' in content or 'Refund of Rs. 0' in content or 'refund of rs. 0' in content.lower():
+            return False, "Contains 'Refund of Rs. 0' (no overcharges but asking for refund)"
+    
+    return True, "OK"
+
 
 # Supported file types
 ALLOWED_MIME_TYPES = [
@@ -450,83 +561,105 @@ async def generate_letters(
     data: LetterGenerate,
     db: Client = Depends(get_db)
 ):
-    """Generate all letters for an analysis."""
+    """Generate scenario-appropriate letters for an analysis.
+    
+    Uses LETTER_MATRIX to only generate letters that make sense for this case.
+    Validates each letter against the analysis data before saving.
+    """
     try:
         analysis = db.table('analyses').select('raw_result').eq('id', data.analysis_id).single().execute()
         
         if not analysis.data:
             raise HTTPException(status_code=404, detail="Analysis not found")
         
-        generator = AdaptiveLetterGenerator(analysis.data['raw_result'])
+        raw_result = analysis.data['raw_result']
+        generator = AdaptiveLetterGenerator(raw_result)
+        
+        # Classify scenario
+        scenario = classify_scenario(raw_result, data)
+        print(f"📋 Letter generation scenario: {scenario}")
+        
+        # Determine which letters to generate
+        letter_types_to_generate = LETTER_MATRIX[scenario]
+        print(f"📋 Letters to generate: {letter_types_to_generate}")
         
         letters = []
+        skipped_letters = []
         
-        # Hospital letters (3 tones)
-        for tone in ['polite', 'professional', 'firm']:
-            content = generator.generate_hospital_letter(
-                tone=tone,
-                patient_name=data.patient_name,
-                hospital_name=data.hospital_name or "[Hospital Name]",
-                bill_number=analysis.data['raw_result'].get('bill_number', '[Bill Number]')
-            )
-
-            inserted = db.table('letters').insert({
-                'analysis_id': data.analysis_id,
-                'letter_type': f'hospital_{tone}',
-                'content': content
-            }).execute()
-
-            letters.append({
-                'id': inserted.data[0]['id'] if inserted.data else None,
-                'letter_type': f'hospital_{tone}',
-                'content': content
-            })
-        
-        # Insurer letter
-        insurer_letter = generator.generate_insurer_letter(
-            tone='firm',
-            patient_name=data.patient_name,
-            insurer_name=data.insurer_name or "[Insurance Company]",
-            policy_number=analysis.data['raw_result'].get('policy_number', '[Policy Number]'),
-            claim_number=analysis.data['raw_result'].get('claim_number', '[Claim Number]')
-        )
-
-        inserted = db.table('letters').insert({
-            'analysis_id': data.analysis_id,
-            'letter_type': 'insurer',
-            'content': insurer_letter
-        }).execute()
-
-        letters.append({
-            'id': inserted.data[0]['id'] if inserted.data else None,
-            'letter_type': 'insurer',
-            'content': insurer_letter
-        })
-        
-        # Patient summary
-        patient_summary = generator.generate_patient_summary(
-            patient_name=data.patient_name
-        )
-        
-        inserted = db.table('letters').insert({
-            'analysis_id': data.analysis_id,
-            'letter_type': 'patient_summary',
-            'content': patient_summary
-        }).execute()
-        
-        letters.append({
-            'id': inserted.data[0]['id'] if inserted.data else None,
-            'letter_type': 'patient_summary',
-            'content': patient_summary
-        })
+        for letter_type in letter_types_to_generate:
+            content = None
+            
+            try:
+                if letter_type == 'hospital_clarification':
+                    content = generator.generate_hospital_clarification_letter(
+                        patient_name=data.patient_name,
+                        hospital_name=data.hospital_name or "Hospital Billing Department",
+                        bill_number=raw_result.get('bill_number') or data.bill_number or "Not Specified"
+                    )
+                elif letter_type.startswith('hospital_'):
+                    tone = letter_type.replace('hospital_', '')
+                    content = generator.generate_hospital_letter(
+                        tone=tone,
+                        patient_name=data.patient_name,
+                        hospital_name=data.hospital_name or "Hospital Billing Department",
+                        bill_number=raw_result.get('bill_number') or data.bill_number or "Not Specified"
+                    )
+                elif letter_type == 'insurer':
+                    content = generator.generate_insurer_letter(
+                        tone='professional',
+                        patient_name=data.patient_name,
+                        insurer_name=data.insurer_name or "Insurance Company",
+                        policy_number=raw_result.get('policy_number') or data.policy_number or "Not Specified",
+                        claim_number=raw_result.get('claim_number') or data.claim_number or "Not Specified"
+                    )
+                elif letter_type == 'patient_summary':
+                    content = generator.generate_patient_summary(
+                        patient_name=data.patient_name,
+                        scenario=scenario
+                    )
+                
+                if not content:
+                    print(f"⚠️ No content generated for {letter_type}")
+                    skipped_letters.append({'type': letter_type, 'reason': 'no_content'})
+                    continue
+                
+                # Validate before saving
+                is_valid, reason = validate_letter_content(content, scenario, raw_result)
+                if not is_valid:
+                    print(f"❌ {letter_type} failed validation: {reason}")
+                    skipped_letters.append({'type': letter_type, 'reason': reason})
+                    continue
+                
+                # Save to DB
+                inserted = db.table('letters').insert({
+                    'analysis_id': data.analysis_id,
+                    'letter_type': letter_type,
+                    'content': content
+                }).execute()
+                
+                letters.append({
+                    'id': inserted.data[0]['id'] if inserted.data else None,
+                    'letter_type': letter_type,
+                    'content': content
+                })
+                print(f"✅ Generated {letter_type}")
+                
+            except Exception as e:
+                print(f"❌ Error generating {letter_type}: {str(e)}")
+                skipped_letters.append({'type': letter_type, 'reason': str(e)})
         
         return {
             "analysis_id": data.analysis_id,
-            "letters": letters
+            "scenario": scenario,
+            "letters": letters,
+            "skipped": skipped_letters
         }
-    
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Letter generation failed: {str(e)}")
+        print(f"❌ Letter generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate letters: {str(e)}")
 
 
 @router.get("/letters/{analysis_id}")
@@ -600,6 +733,7 @@ async def download_letter_pdf(
         
         # Friendly filename based on letter type
         filename_map = {
+            'hospital_clarification': 'Hospital_Clarification_Request.pdf',
             'hospital_polite': 'Hospital_Letter_Polite.pdf',
             'hospital_professional': 'Hospital_Letter_Professional.pdf',
             'hospital_firm': 'Hospital_Letter_Firm.pdf',

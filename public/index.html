@@ -2249,13 +2249,17 @@ window.handleLetters = async function(event) {
             }
             return;
         }
-        
+
+
         const data = await response.json();
         console.log('✅ Letters generated:', data);
-        
+
         // Store letters for download page
-        window.generatedLetters = data;
-        
+        window.generatedLetters = data.letters;
+
+        // Render download buttons
+        renderDownloadButtons();
+
         // Move to download page
         document.getElementById('letters').classList.remove('active');
         document.getElementById('download').classList.add('active');
@@ -2325,7 +2329,7 @@ window.handleLetters = async function(event) {
         
         // Store letters for download page
         window.generatedLetters = data.letters;
-
+        window.lettersResponse = data;  // saves scenario, skipped letters, etc.
         renderDownloadButtons();
         
         // Move to download page
@@ -2340,6 +2344,147 @@ window.handleLetters = async function(event) {
         submitBtn.disabled = false;
     }
 };
+function renderDownloadButtons() {
+    const container = document.getElementById('lettersDownloadContainer');
+    if (!container || !window.generatedLetters) return;
+    
+    const LETTER_META = {
+        'hospital_clarification': {
+            title: 'Clarification Request Letter',
+            subtitle: 'For Hospital Billing Department',
+            preview: 'A polite, professional letter requesting clarification on unclear bill items. Use this to ask the hospital for procedure codes, package details, and tariff information before disputing any charges.'
+        },
+        'hospital_professional': {
+            title: 'Hospital Objection Letter',
+            subtitle: 'For Hospital Billing Department',
+            preview: 'A formal objection to verified overcharges in your bill. Cite CGHS benchmarks and request a revised bill with corrections.'
+        },
+        'hospital_polite': {
+            title: 'Hospital Inquiry Letter (Polite)',
+            subtitle: 'For Hospital Billing Department',
+            preview: 'A polite inquiry about potential billing issues.'
+        },
+        'hospital_firm': {
+            title: 'Hospital Objection Letter (Firm)',
+            subtitle: 'For Hospital Billing Department',
+            preview: 'A firm objection demanding correction of overcharges within 15 days.'
+        },
+        'insurer': {
+            title: 'Insurance Escalation Letter',
+            subtitle: 'For Insurance Grievance Officer',
+            preview: 'An escalation of claim rejection citing IRDAI regulations. Use when your insurer has wrongfully rejected or short-paid your claim.'
+        },
+        'patient_summary': {
+            title: 'Your Action Plan',
+            subtitle: 'Personal Reference Document',
+            preview: 'A summary of findings, recommended next steps, and a checklist tailored to your specific bill situation.'
+        }
+    };
+    
+    container.innerHTML = '';
+    
+    // Render only the letters that were actually generated
+    window.generatedLetters.forEach(letter => {
+        const meta = LETTER_META[letter.letter_type];
+        if (!meta) return;
+        
+        const card = document.createElement('div');
+        card.className = 'letter-card';
+        card.innerHTML = `
+            <div class="letter-card-header">
+                <h3>${meta.title}</h3>
+                <p class="letter-subtitle">${meta.subtitle}</p>
+            </div>
+            <p class="letter-preview">${meta.preview}</p>
+            <div class="letter-actions">
+                <button class="btn-primary" onclick="downloadLetterPDF('${letter.id}')">📄 Download PDF</button>
+                <button class="btn-secondary" onclick="previewLetter('${letter.id}')">👁 Preview</button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+    
+    // Show explanation if certain letters were intentionally skipped
+    const hasInsurerLetter = window.generatedLetters.some(l => l.letter_type === 'insurer');
+    const scenario = window.lettersResponse?.scenario;
+    
+    if (!hasInsurerLetter && scenario && (scenario === 'A_cash_clarification' || scenario === 'B_cash_objection' || scenario === 'D_hospital_overcharge_only')) {
+        const explainer = document.createElement('div');
+        explainer.className = 'letter-explainer';
+        explainer.style.cssText = 'background: #f3f4f6; border-left: 4px solid #6b7280; padding: 1rem 1.5rem; margin-top: 1rem; border-radius: 8px; font-size: 14px; color: #4b5563;';
+        explainer.innerHTML = `
+            <strong>ℹ️ No insurance letter was generated</strong><br>
+            We did not detect an insurance claim involved in this bill. If your insurer was involved and you'd like an escalation letter, please re-run the analysis with your policy and claim details filled in.
+        `;
+        container.appendChild(explainer);
+    }
+}
+
+async function downloadLetterPDF(letterId) {
+    if (!letterId) {
+        alert('Letter ID missing. Please regenerate letters.');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/api/letters/${letterId}/pdf`);
+        
+        if (!response.ok) {
+            alert(`Failed to download PDF: ${response.status}`);
+            return;
+        }
+        
+        // Get filename from response headers
+        const disposition = response.headers.get('Content-Disposition');
+        let filename = 'letter.pdf';
+        if (disposition) {
+            const match = disposition.match(/filename="(.+)"/);
+            if (match) filename = match[1];
+        }
+        
+        // Download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        
+    } catch (error) {
+        console.error('Download error:', error);
+        alert('Failed to download PDF: ' + error.message);
+    }
+}
+
+function previewLetter(letterId) {
+    const letters = window.generatedLetters || [];
+    const letter = letters.find(l => l.id === letterId);
+    
+    if (!letter) {
+        alert('Letter not found');
+        return;
+    }
+    
+    // Show in a popup window
+    const previewWindow = window.open('', '_blank', 'width=800,height=900');
+    previewWindow.document.write(`
+        <html>
+            <head>
+                <title>${letter.letter_type} Preview</title>
+                <style>
+                    body { font-family: Georgia, serif; max-width: 700px; margin: 2rem auto; padding: 2rem; line-height: 1.6; }
+                    pre { white-space: pre-wrap; font-family: inherit; }
+                </style>
+            </head>
+            <body>
+                <pre>${letter.content}</pre>
+            </body>
+        </html>
+    `);
+}
 function renderDownloadButtons() {
     const letters = window.generatedLetters || [];
     if (!letters.length) return;
@@ -2378,19 +2523,19 @@ function renderDownloadButtons() {
         };
         
         return `
-            <div class="letter-download-card">
+            <div class="letter-card">
                 <div class="letter-header">
                     <div>
-                        <h3>${meta.title}</h3>
-                        <p style="color: var(--text-muted); font-size: 0.875rem;">${meta.subtitle}</p>
+                        <div class="letter-title">${meta.title}</div>
+                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">${meta.subtitle}</p>
                     </div>
-                    <div class="download-buttons">
+                    <div class="download-actions">
                         <button class="download-btn download-pdf" onclick="downloadLetterPDF('${letter.id}')">📄 PDF</button>
                         <button class="download-btn download-word" onclick="alert('Word format coming soon!')">📝 Word</button>
-                        <button class="download-btn download-preview" onclick="previewLetter('${letter.id}')">👁 Preview</button>
+                        <button class="download-btn preview-btn" onclick="previewLetter('${letter.id}')">👁 Preview</button>
                     </div>
                 </div>
-                <div class="letter-preview-text">
+                <div style="background: var(--bg); padding: 1rem; border-radius: 8px; font-family: 'Geist Mono', monospace; font-size: 0.85rem;">
                     <strong>Preview:</strong> ${meta.preview}
                 </div>
             </div>
@@ -2453,8 +2598,17 @@ function previewLetter(letterId) {
             <head>
                 <title>${letter.letter_type} Preview</title>
                 <style>
-                    body { font-family: Georgia, serif; max-width: 700px; margin: 2rem auto; padding: 2rem; line-height: 1.6; }
-                    pre { white-space: pre-wrap; font-family: inherit; }
+                    body { 
+                        font-family: Georgia, serif; 
+                        max-width: 700px; 
+                        margin: 2rem auto; 
+                        padding: 2rem; 
+                        line-height: 1.6; 
+                    }
+                    pre { 
+                        white-space: pre-wrap; 
+                        font-family: inherit; 
+                    }
                 </style>
             </head>
             <body>

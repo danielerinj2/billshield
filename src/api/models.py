@@ -46,13 +46,16 @@ class IssueDetail(BaseModel):
     action_required: str
 
 
+"""Request to generate letters."""
 class LetterGenerate(BaseModel):
-    """Request to generate letters."""
     analysis_id: str
     tone: str = Field(default="professional", pattern="^(polite|professional|firm)$")
     patient_name: str
     hospital_name: Optional[str] = None
     insurer_name: Optional[str] = None
+    bill_number: Optional[str] = None
+    policy_number: Optional[str] = None
+    claim_number: Optional[str] = None
 
 
 class LetterResponse(BaseModel):
