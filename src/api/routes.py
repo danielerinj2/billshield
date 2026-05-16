@@ -11,6 +11,14 @@ from fastapi import APIRouter, HTTPException, Depends, File, UploadFile, Form
 from fastapi.responses import JSONResponse
 from supabase import Client
 
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.enums import TA_LEFT
+from fastapi.responses import StreamingResponse
+from io import BytesIO
+
 from src.api.database import get_db
 from src.api.models import (
     AnalysisCreate,
@@ -439,13 +447,13 @@ async def generate_letters(
                 hospital_name=data.hospital_name or "[Hospital Name]",
                 bill_number=analysis.data['raw_result'].get('bill_number', '[Bill Number]')
             )
-            
+
             inserted = db.table('letters').insert({
                 'analysis_id': data.analysis_id,
                 'letter_type': f'hospital_{tone}',
                 'content': content
             }).execute()
-            
+
             letters.append({
                 'id': inserted.data[0]['id'] if inserted.data else None,
                 'letter_type': f'hospital_{tone}',
@@ -460,13 +468,13 @@ async def generate_letters(
             policy_number=analysis.data['raw_result'].get('policy_number', '[Policy Number]'),
             claim_number=analysis.data['raw_result'].get('claim_number', '[Claim Number]')
         )
-        
+
         inserted = db.table('letters').insert({
             'analysis_id': data.analysis_id,
             'letter_type': 'insurer',
             'content': insurer_letter
         }).execute()
-        
+
         letters.append({
             'id': inserted.data[0]['id'] if inserted.data else None,
             'letter_type': 'insurer',
@@ -514,15 +522,6 @@ async def get_letters(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch letters: {str(e)}")
-
-
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.enums import TA_LEFT
-from fastapi.responses import StreamingResponse
-from io import BytesIO
 
 
 @router.get("/letters/{letter_id}/pdf")
