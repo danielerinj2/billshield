@@ -75,6 +75,13 @@ def classify_document(parsed_data: Dict) -> str:
     Returns:
         One of DocumentType constants
     """
+    line_items = parsed_data.get("line_items", [])
+    
+    # NEW: Detect category summary bills (not itemized)
+    if _is_category_summary(line_items):
+        print("📋 Detected category summary bill - routing to HOSPITAL_BILL analyzer")
+        return DocumentType.HOSPITAL_BILL  # Don't route to PharmacyAnalyzer
+    
     # Extract text content for pattern matching
     text_content = _extract_text_content(parsed_data)
     text_lower = text_content.lower()
@@ -87,7 +94,6 @@ def classify_document(parsed_data: Dict) -> str:
     insurance_score = _count_signals(text_lower, INSURANCE_SIGNALS)
     
     # Check line items for pharmacy/lab patterns
-    line_items = parsed_data.get("line_items", [])
     pharmacy_item_ratio = _pharmacy_item_ratio(line_items) if line_items else 0
     lab_item_ratio = _lab_item_ratio(line_items) if line_items else 0
     
@@ -127,6 +133,47 @@ def classify_document(parsed_data: Dict) -> str:
         return DocumentType.HOSPITAL_BILL
     
     return DocumentType.UNKNOWN
+
+
+def _is_category_summary(line_items: List[Dict]) -> bool:
+    """
+    Detect if this is a category-summary bill (not itemized).
+    
+    Category summary bills have lines like:
+    - MEDICINE CHARGES: ₹18,826
+    - ROOM/WARD RENT: ₹3,700
+    - LABORATORY: ₹4,460
+    
+    NOT individual items like:
+    - Paracetamol 500mg Tab (Batch: XYZ123, MRP: ₹2.50)
+    - Complete Blood Count (CBC)
+    """
+    if not line_items or len(line_items) < 3:
+        return False
+    
+    category_keywords = [
+        "medicine charges", "pharmacy charges", "drug charges",
+        "room/ward rent", "room charges", "bed charges", "ward rent",
+        "laboratory", "laboratory charges", "lab charges",
+        "consultation", "consultation charges", "ip consultation",
+        "procedures", "procedure charges", "surgical charges",
+        "medical equipment", "equipment charges",
+        "nursing charges", "nursing procedure",
+        "hospital services", "service charges",
+        "ot charges", "operation theatre",
+        "diet charge", "diet charges"
+    ]
+    
+    summary_count = 0
+    for item in line_items[:10]:  # Check first 10 items
+        desc = item.get("description", "").lower().strip()
+        
+        # Check if description is a category name (not a specific item)
+        if any(kw == desc or desc.startswith(kw) for kw in category_keywords):
+            summary_count += 1
+    
+    # If 3+ items are category names (not specific drugs/tests), it's a summary
+    return summary_count >= 3
 
 
 def _extract_text_content(parsed_data: Dict) -> str:

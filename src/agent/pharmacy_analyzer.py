@@ -125,6 +125,10 @@ class PharmacyAnalyzer:
         description = item.get("description", "")
         amount = item.get("amount", 0)
         qty = item.get("quantity", 1)
+
+        # NEW: Skip category-level summary items
+        if self._is_category_summary_item(description):
+            return None  # Don't try to match categories to NPPA
         
         # Search NPPA database
         try:
@@ -362,3 +366,13 @@ class PharmacyAnalyzer:
             summary=summary,
             recommendations=recommendations,
         )
+    
+    def _is_category_summary_item(self, description: str) -> bool:
+        """Check if this is a category summary, not an individual drug."""
+        summary_keywords = [
+            "medicine charges", "pharmacy charges", "drug charges",
+            "total medicines", "total drugs", "consumables",
+            "medical supplies"
+        ]
+        desc_lower = description.lower().strip()
+        return any(kw in desc_lower for kw in summary_keywords)
