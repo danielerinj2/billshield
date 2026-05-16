@@ -317,19 +317,27 @@ class BillShieldAgent:
                 or any(keyword in description for keyword in SURGICAL_KEYWORDS)
             )
 
-            is_room = (
-                category == "room charges"
-                or any(keyword in description for keyword in ROOM_KEYWORDS)
-            )
-
+            # Check atomic FIRST - lab consumables, drugs, tests must never be bundled into room/surgical episodes
             is_atomic = any(keyword in description for keyword in ATOMIC_KEYWORDS)
 
+            # Room match requires EXPLICIT room/ward terms - not just any keyword brush
+            # Also requires the room category match OR a strong room indicator in description
+            is_room = (
+                category in ("room charges", "room/ward rent", "room")
+                or any(
+                    f" {kw} " in f" {description} " or description.startswith(kw + " ") or description == kw
+                    for kw in ROOM_KEYWORDS
+                )
+            )
+
+            # Priority: surgical > atomic > room > default-atomic
+            # Atomic beats room so blood tubes, syringes, lab consumables don't get bundled into room/stay
             if is_surgical:
                 surgical_items.append(item)
-            elif is_room:
-                room_items.append(item)
             elif is_atomic:
                 atomic_items.append(item)
+            elif is_room:
+                room_items.append(item)
             else:
                 atomic_items.append(item)
 
@@ -513,8 +521,16 @@ class BillShieldAgent:
             )
 
         elif episode_type == "room_stay":
-            room_category = bill_data.get("room_category", department)
-            description = f"{department} room/stay charges - needs tariff verification"
+            # Use room_category from bill extraction; fall back gracefully
+            extracted_room = bill_data.get("room_category")
+            if extracted_room and str(extracted_room).strip().lower() not in ("unknown", "none", ""):
+                room_category = extracted_room
+            elif department and str(department).strip().lower() != "unknown":
+                room_category = department
+            else:
+                room_category = "Room/Ward"
+
+            description = f"{room_category} charges - tariff verification needed"
             evidence.append(f"Room category: {room_category}")
             evidence.append("Room charges should align with hospital's published daily tariff")
 
