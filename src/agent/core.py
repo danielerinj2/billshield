@@ -12,6 +12,45 @@ from src.agent.multi_procedure_detection import (
     validate_settlement_timelines,
 )
 
+def sanitize_metadata_field(value: Any, max_length: int = 200) -> str | None:
+    """
+    Sanitize metadata extracted from vision LLM.
+    Filters out hallucinations, placeholders, and garbage data.
+    """
+    if value is None:
+        return None
+    
+    # Must be a string
+    if not isinstance(value, str):
+        return None
+    
+    cleaned = value.strip()
+    
+    # Empty or too short
+    if len(cleaned) < 2:
+        return None
+    
+    # Too long (likely hallucination)
+    if len(cleaned) > max_length:
+        return None
+    
+    # Common placeholder patterns the LLM might return
+    placeholder_patterns = [
+        'null', 'none', 'n/a', 'na', 'unknown', 'not visible',
+        'not specified', 'not available', 'not provided',
+        '[hospital name]', '[bill number]', '[patient name]',
+        '[insert', 'tbd', 'pending', '---', '___'
+    ]
+    
+    cleaned_lower = cleaned.lower()
+    if cleaned_lower in placeholder_patterns:
+        return None
+    
+    # Check if it's just brackets/placeholders
+    if cleaned.startswith('[') and cleaned.endswith(']'):
+        return None
+    
+    return cleaned
 
 class IssueType(Enum):
     """Types of billing issues the agent can detect."""
@@ -60,7 +99,6 @@ class BillingIssue:
             "confidence": self.confidence.value,
         }
 
-
 @dataclass
 class AnalysisResult:
     """Complete bill analysis result."""
@@ -74,6 +112,17 @@ class AnalysisResult:
     issues: List[BillingIssue]
     summary: str
     recommendations: List[str]
+    # Metadata fields (optional, default None for backwards compatibility)
+    hospital_name: str | None = None
+    bill_number: str | None = None
+    bill_date: str | None = None
+    patient_name: str | None = None
+    patient_id: str | None = None
+    admission_date: str | None = None
+    discharge_date: str | None = None
+    policy_number: str | None = None
+    claim_number: str | None = None
+    insurer_name: str | None = None
 
     def to_dict(self):
         """Convert to dictionary for JSON serialization."""
@@ -1212,6 +1261,10 @@ class BillShieldAgent:
         if not recommendations:
             recommendations = ["No action needed at this time."]
 
+
+# Extract metadata from bill_data (handles both vision LLM and regex parser outputs)
+# Vision parser puts metadata at top level; regex parser puts it under 'header'
+        header = bill_data.get('header', {})
         return AnalysisResult(
             total_bill=total_bill,
             total_approved=total_approved,
@@ -1223,6 +1276,37 @@ class BillShieldAgent:
             issues=issues,
             summary=summary,
             recommendations=recommendations,
+            # Metadata - try vision LLM keys (top-level) first, then regex parser keys (header)
+            hospital_name=sanitize_metadata_field(
+                bill_data.get('hospital_name') or header.get('hospital_name')
+            ),
+            bill_number=sanitize_metadata_field(
+                bill_data.get('bill_number') or header.get('bill_number')
+            ),
+            bill_date=sanitize_metadata_field(
+                bill_data.get('bill_date') or header.get('bill_date')
+            ),
+            patient_name=sanitize_metadata_field(
+                bill_data.get('patient_name') or header.get('patient_name')
+            ),
+            patient_id=sanitize_metadata_field(
+                bill_data.get('patient_id') or header.get('patient_id')
+            ),
+            admission_date=sanitize_metadata_field(
+                bill_data.get('admission_date') or header.get('admission_date')
+            ),
+            discharge_date=sanitize_metadata_field(
+                bill_data.get('discharge_date') or header.get('discharge_date')
+            ),
+            policy_number=sanitize_metadata_field(
+                bill_data.get('policy_number') or header.get('policy_number')
+            ),
+            claim_number=sanitize_metadata_field(
+                bill_data.get('claim_number') or header.get('claim_number')
+            ),
+            insurer_name=sanitize_metadata_field(
+                bill_data.get('insurer_name') or header.get('insurer_name')
+            ),
         )
 
 

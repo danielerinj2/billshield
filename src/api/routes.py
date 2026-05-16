@@ -330,9 +330,11 @@ async def run_analysis(
         print(f"🔍 Result.issues length: {len(result.issues) if hasattr(result, 'issues') else 0}")
         if hasattr(result, 'issues') and len(result.issues) > 0:
             print(f"🔍 First issue: {result.issues[0]}")
-        
-        # Update analysis record
-        db.table('analyses').update({
+
+
+
+        # Update analysis record (only update metadata fields if they were extracted, preserve existing values otherwise)
+        update_payload = {
             'status': 'complete',
             'bill_total': result.total_bill,
             'insurance_approved': result.total_approved,
@@ -342,7 +344,27 @@ async def run_analysis(
             'min_recoverable': result.estimated_recoverable['min'],
             'max_recoverable': result.estimated_recoverable['max'],
             'raw_result': result.to_dict()
-        }).eq('id', analysis_id).execute()
+        }
+
+        # Only update metadata if we successfully extracted it (don't overwrite user-entered values with null)
+        if result.hospital_name:
+            update_payload['hospital_name'] = result.hospital_name
+        if result.bill_number:
+            update_payload['bill_number'] = result.bill_number
+        if result.patient_name:
+            update_payload['patient_name'] = result.patient_name
+        if result.policy_number:
+            update_payload['policy_number'] = result.policy_number
+        if result.claim_number:
+            update_payload['claim_number'] = result.claim_number
+
+        # Log what we extracted for debugging
+        print(f"📋 Extracted metadata:")
+        print(f"   Hospital: {result.hospital_name or 'NOT FOUND'}")
+        print(f"   Bill #:   {result.bill_number or 'NOT FOUND'}")
+        print(f"   Patient:  {result.patient_name or 'NOT FOUND'}")
+
+        db.table('analyses').update(update_payload).eq('id', analysis_id).execute()    
         
         # Insert issues with comprehensive debugging
         print(f"💾 BEFORE INSERT: Agent returned {len(result.issues)} issues")
