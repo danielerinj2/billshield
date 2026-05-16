@@ -67,6 +67,12 @@ def build_vision_prompt(doc_type: str) -> str:
     if doc_type == "bill":
         return """You are analyzing a hospital bill. Extract data with MAXIMUM ACCURACY.
 
+CRITICAL: Hospital bills often have TWO parts:
+1. SUMMARY PAGE (page 1) - shows category totals like "MEDICINE CHARGES: ₹18,826"
+2. DETAILED PAGES (pages 2+) - shows individual items like "Magnex Forte 1.5gm - qty 4 - ₹3,191"
+
+YOU MUST EXTRACT BOTH. Ignore the summary page categories and focus on the detailed line items.
+
 EXTRACTION HIERARCHY (in priority order):
 
 1. PROCEDURE NAME - Look in this order:
@@ -77,149 +83,97 @@ EXTRACTION HIERARCHY (in priority order):
    e) Doctor's specialization + visible context
    f) Department name (lowest priority - DO NOT GUESS)
 
-2. LINE ITEM DESCRIPTION RULES:
+2. LINE ITEM EXTRACTION RULES:
+   
+   CRITICAL: Extract EVERY INDIVIDUAL ITEM from the detailed pages, NOT category summaries.
+   
+   FOR MEDICINES/DRUGS:
+   - Extract: Drug name, strength/dosage, batch number, quantity, rate per unit, total amount
+   - Example: "Magnex Forte 1.5gm - Batch: 30049099 - Qty: 4 - Rate: ₹797.93 - Amount: ₹3,191.74"
+   - Include consumables: syringes, gauze, cannulas, IV sets, etc.
+   
+   FOR LAB TESTS:
+   - Extract: Test name, individual test price
+   - Example: "Complete Blood Count (CBC) - ₹280.00"
+   - Example: "Blood Urea - ₹100.00"
+   - Do NOT group as "LABORATORY - ₹4,460" - extract each test separately
+   
+   FOR PROCEDURES:
+   - Extract: Procedure name, procedure charges
+   - Example: "Clinical Support Care - ₹75.00"
+   
+   FOR ROOM CHARGES:
+   - Extract: Room type, number of days, daily rate, total
+   - Example: "A/C Room - 2 days - ₹1,850/day - ₹3,700"
+   
+   FOR CONSULTATIONS:
+   - Extract: Doctor name/specialization, consultation type, amount
+   - Example: "IP Consultation - Dr. Jaisankar P - ₹1,000"
 
-   RULE A: If procedure name is EXPLICITLY visible on bill:
-   - Combine it with each charge
-   - Format: "{PROCEDURE_NAME} - {ORIGINAL_CHARGE_TEXT}"
-   - Example: Bill says "Diagnosis: Acute Appendicitis" + "Operation Charges ₹45,000"
-   - Extract: "ACUTE APPENDICITIS - OPERATION CHARGES"
+3. WHAT NOT TO EXTRACT AS LINE ITEMS:
+   - Category summaries like "MEDICINE CHARGES: ₹18,826" - SKIP THESE
+   - Category summaries like "LABORATORY: ₹4,460" - SKIP THESE
+   - Only extract if it's an INDIVIDUAL item with specific details
 
-   RULE B: If procedure name is NOT visible but department is:
-   - Use department + original charge
-   - Format: "{DEPARTMENT} - {ORIGINAL_CHARGE_TEXT}"
-   - Example: Only "Cardiology" + "Procedure Charges"
-   - Extract: "CARDIOLOGY - PROCEDURE CHARGES"
-   - Set procedure_name to null
+4. QUANTITY AND RATE:
+   - Always extract quantity if visible (even if it's 1)
+   - Always extract per-unit rate if visible
+   - Calculate: amount should equal rate × quantity (within rounding tolerance)
 
-   RULE C: For generic charges (Room/Nursing/Medicine):
-   - Use original description as-is
-   - Don't add procedure context unless useful
+5. RETURNS/CREDITS:
+   - If you see negative amounts or "RETURN DETAILS", mark quantity as negative
+   - Example: "Syringe - 5ml (Bd) - RETURN - Qty: -2 - Amount: -₹18.84"
 
-3. NEVER INFER OR GUESS:
-   ❌ Don't assume "Cardiology" = "Angioplasty"
-   ❌ Don't assume "Orthopedics" = "Knee Replacement"
-   ❌ Don't use medical knowledge to fill gaps
-   ✅ Only extract what is WRITTEN on the bill
-
-4. CONFIDENCE LEVELS:
-   - "high": Procedure name explicitly written on bill
-   - "medium": Inferred from clear context (diagnosis + department)
-   - "low": Only department visible, procedure unclear
-
-RETURN ONLY VALID JSON:
+RETURN FORMAT:
 {
-  "hospital_name": "exact name from bill",
-  "patient_name": "exact name from bill",
-  "bill_number": "exact bill/invoice number",
-  "bill_date": "DD-MMM-YYYY",
-  "admission_date": "DD-MMM-YYYY",
-  "discharge_date": "DD-MMM-YYYY",
-  "department": "exact department from bill or null",
-  "diagnosis": "exact diagnosis text from bill or null",
-  "procedure_name": "exact procedure if visible, else null",
-  "procedure_confidence": "high|medium|low",
-  "procedure_codes": ["ICD-10 or CPT codes if visible"],
-  "room_category": "exact room type from bill",
-  "total_amount": 0.0,
+  "hospital_name": "string",
+  "bill_number": "string",
+  "bill_date": "YYYY-MM-DD",
+  "patient_name": "string",
+  "diagnosis": "string or null",
+  "procedure_name": "string or null",
+  "doctor_name": "string or null",
+  "admission_date": "YYYY-MM-DD or null",
+  "discharge_date": "YYYY-MM-DD or null",
+  "room_type": "string or null",
+  "total_amount": number,
   "line_items": [
     {
-      "description": "formatted per rules above",
-      "original_text": "exact text from bill before any modification",
-      "quantity": 1.0,
-      "rate": 0.0,
-      "amount": 0.0,
-      "category": "Room Charges|Medicine|Procedure Charges|Lab Tests|Consumables|Doctor Fees|Nursing Charges|Other"
+      "description": "Full item description with details",
+      "category": "MEDICINE" | "LAB" | "ROOM" | "CONSULTATION" | "PROCEDURE" | "CONSUMABLE" | "OTHER",
+      "quantity": number,
+      "rate": number or null,
+      "amount": number,
+      "batch_no": "string or null (for medicines)",
+      "hsn_code": "string or null"
     }
   ]
 }
 
-CRITICAL RULES:
-- Always include "original_text" with EXACT bill wording (no modification)
-- "description" can have procedure/department prefix for better matching
-- Parse amounts as numbers (no ₹, no commas)
-- If unsure about procedure name, set to null and use department
-- Ensure valid JSON (proper commas, no trailing commas)
+EXAMPLE OUTPUT for a drug line:
+{
+  "description": "Magnex Forte 1.5gm (Batch: 30049099)",
+  "category": "MEDICINE",
+  "quantity": 4,
+  "rate": 797.93,
+  "amount": 3191.74,
+  "batch_no": "30049099",
+  "hsn_code": null
+}
+
+EXAMPLE OUTPUT for a lab test:
+{
+  "description": "Complete Blood Count (CBC)",
+  "category": "LAB",
+  "quantity": 1,
+  "rate": 280.00,
+  "amount": 280.00,
+  "batch_no": null,
+  "hsn_code": null
+}
+
+Extract ONLY valid JSON. No markdown fences, no preamble, no explanation.
 """
-    
-    elif doc_type == "discharge":
-        return """You are a medical records expert. Extract structured data from this hospital discharge summary image.
-
-Return ONLY valid JSON (no markdown, no explanation) with this exact structure:
-
-{
-  "patient": {
-    "name": "string or null",
-    "mrn": "string or null",
-    "age": number,
-    "sex": "Male/Female or null",
-    "admission_date": "DD/MM/YYYY or null",
-    "discharge_date": "DD/MM/YYYY or null",
-    "consultant": "string or null"
-  },
-  "diagnoses": {
-    "primary": "string or null",
-    "primary_icd10": "string or null",
-    "secondary": ["string"]
-  },
-  "procedures": [
-    {
-      "name": "string",
-      "date": "DD/MM/YYYY or null",
-      "performed_by": "string or null"
-    }
-  ],
-  "medications": [
-    {
-      "drug": "string",
-      "frequency": "string or null",
-      "duration": "string or null"
-    }
-  ]
-}
-
-If a field is not visible, use null. Extract all procedures and medications listed."""
-    
-    elif doc_type == "rejection":
-        return """You are an insurance claims expert. Extract structured data from this rejection/settlement letter image.
-
-Return ONLY valid JSON (no markdown, no explanation) with this exact structure:
-
-{
-  "insurer": {
-    "name": "string or null",
-    "irdai_registration": "string or null"
-  },
-  "claim_metadata": {
-    "claim_number": "string or null",
-    "policy_number": "string or null",
-    "patient_name": "string or null",
-    "hospital": "string or null",
-    "admission_date": "DD/MM/YYYY or null",
-    "discharge_date": "DD/MM/YYYY or null"
-  },
-  "financial_summary": {
-    "amount_claimed": number,
-    "amount_settled": number,
-    "amount_rejected": number
-  },
-  "itemized_assessment": [
-    {
-      "description": "string",
-      "amount_claimed": number,
-      "amount_settled": number,
-      "status": "APPROVED/REJECTED/PARTIALLY APPROVED",
-      "cited_clause": "string or null",
-      "rejection_reason": "string or null"
-    }
-  ]
-}
-
-Extract ALL items from the itemized assessment table. If a field is not visible, use null."""
-    
-    else:
-        raise ValueError(f"Unknown document type: {doc_type}")
-
 
 def parse_with_vision_llm(
     image: Image.Image,
