@@ -634,8 +634,21 @@ class BillShieldAgent:
 
         for item in atomic_items:
             description = item.get("description", "").lower()
-            amount = item.get("amount", 0)
+            raw_amount = item.get("amount")
             category = item.get("category", "").lower()
+
+            try:
+                amount = float(raw_amount) if raw_amount is not None else None
+            except (TypeError, ValueError):
+                amount = None
+
+            if amount is None:
+                print(f"⏭️  Skipping item with missing/invalid amount: {description}")
+                unmatched_items.append({
+                    "item": item,
+                    "reason": "missing_or_invalid_amount"
+                })
+                continue
 
             if amount == 0:
                 continue
@@ -644,14 +657,9 @@ class BillShieldAgent:
             if amount < 0:  # Negative returns (like -₹4.30)
                 print(f"⏭️  Skipping negative return: {description} (₹{amount})")
                 continue
-            
-            if amount < 50 and any(kw in description for kw in [
-                "blood colle", "blood tube", "edta", "syringe", "needle", 
-                "gauze", "cotton", "band", "gloves", "tube"
-            ]):
-                print(f"⏭️  Skipping low-value consumable: {description} (₹{amount})")
-                continue
 
+            # Don't skip consumables - they're legitimate line items
+            # The "garbage detection" happened earlier in vision parser, not here
             print(f"📝 Analyzing: {description} (₹{amount})")
             issue = None
         
