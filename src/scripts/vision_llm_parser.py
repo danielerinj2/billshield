@@ -93,10 +93,12 @@ EXTRACTION HIERARCHY (in priority order):
    - Include consumables: syringes, gauze, cannulas, IV sets, etc.
    
    FOR LAB TESTS:
-   - Extract: Test name, individual test price
-   - Example: "Complete Blood Count (CBC) - ₹280.00"
-   - Example: "Blood Urea - ₹100.00"
-   - Do NOT group as "LABORATORY - ₹4,460" - extract each test separately
+   - Extract: Test name, individual test price FROM THE DETAILED PAGES
+   - CRITICAL: Each lab test has its OWN amount on pages 3-8. DO NOT use the category total from page 1.
+   - Example: "Complete Blood Count (CBC)" on page 7 shows ₹280.00 - use 280.00, NOT the LABORATORY total
+   - Example: "Blood Urea" on page 7 shows ₹100.00 - use 100.00, NOT the LABORATORY total
+   - If you see "LABORATORY: ₹4,460" on page 1, SKIP IT - that's a category summary
+   - Only extract individual test lines with their individual amounts
    
    FOR PROCEDURES:
    - Extract: Procedure name, procedure charges
