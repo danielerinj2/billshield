@@ -479,7 +479,61 @@ class BillShieldAgent:
         procedure_name = bill_data.get("procedure_name", "")
         department = bill_data.get("department", "")
         print(f"🏥 Bill Context: Procedure={procedure_name}, Department={department}")
+        # BLOCK category-level lines from benchmarking
+        CATEGORY_BLOCKLIST = {
+            "medicine charges", "medicines", "pharmacy", "pharmacy charges",
+            "laboratory", "laboratory charges", "lab charges", "lab",
+            "consumables", "consumable charges", "miscellaneous",
+            "ip consultation", "op consultation", "consultation",
+            "procedures", "procedure charges",
+            "investigation", "investigations", "diagnostic charges",
+            "nursing charges", "nursing", "service charges",
+        }
 
+        for item in atomic_items:
+            description = item.get("description", "").lower()
+            raw_amount = item.get("amount")
+            category = item.get("category", "").lower()
+
+            try:
+                amount = float(raw_amount) if raw_amount is not None else None
+            except (TypeError, ValueError):
+                amount = None
+
+            if amount is None:
+                print(f"⏭️  Skipping item with missing/invalid amount: {description}")
+                unmatched_items.append({
+                    "item": item,
+                    "reason": "missing_or_invalid_amount"
+                })
+                continue
+
+            if amount == 0:
+                continue
+
+            desc_normalized = description.strip().lower()
+            if desc_normalized in CATEGORY_BLOCKLIST:
+                print(f"⏭️  Skipping category-level line: {description}")
+                self.issue_counter += 1
+                issues.append(BillingIssue(
+                    issue_id=f"CAT_{self.issue_counter:03d}",
+                    issue_type=IssueType.MISSING_ITEMIZATION,
+                    description=f"{description} - itemization required",
+                    billed_amount=amount,
+                    benchmark_amount=None,
+                    overcharge_amount=None,
+                    confidence=Confidence.LOW,
+                    evidence=[
+                        f"Billed amount: ₹{amount:,.2f}",
+                        "This is a category total, not an individual item",
+                        "Cannot benchmark without itemized breakdown",
+                    ],
+                    action_required=f"Request itemized breakdown of {description} from hospital",
+                    benchmark_type="ITEMIZATION_REQUIRED",
+                    match_quality=0.0,
+                    matched_procedure=None,
+                ))
+                continue
         for item in atomic_items:
             description = item.get("description", "").lower()
             raw_amount = item.get("amount")
