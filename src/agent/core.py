@@ -12,6 +12,71 @@ from src.agent.multi_procedure_detection import (
     validate_settlement_timelines,
 )
 
+
+
+# Hardcoded CGHS lab test rates for common tests
+# Source: CGHS 2025 rate list
+LAB_TEST_CGHS_RATES = {
+    # Blood tests - Hematology
+    "complete blood count": 280,
+    "complete bloodcount": 280,
+    "cbc": 280,
+    "haemoglobin": 60,
+    "hemoglobin": 60,
+    "hb": 60,
+    "platelet count": 110,
+    "total wbc count": 80,
+    "differential count": 100,
+    "esr": 50,
+    
+    # Blood tests - Biochemistry
+    "blood urea": 100,
+    "urea": 100,
+    "creatinine": 100,
+    "blood sugar": 80,
+    "glucose fasting": 80,
+    "glucose random": 80,
+    "sodium": 125,
+    "potassium": 125,
+    "sodium & potassium": 250,
+    "sodium and potassium": 250,
+    
+    # Liver function
+    "lft": 440,
+    "liver function test": 440,
+    "sgot": 120,
+    "sgpt": 120,
+    "bilirubin total": 100,
+    
+    # Inflammatory markers
+    "crp": 280,
+    "c-reactive protein": 280,
+    
+    # Cultures
+    "blood culture": 750,
+    "urine culture": 400,
+    
+    # Consultations
+    "ip consultation": 1000,
+    "op consultation": 150,
+    "cross consultation": 150,
+}
+
+def normalize_test_name(description: str) -> str:
+    """Normalize lab test name for matching."""
+    # Remove common bill artifacts
+    desc = description.lower()
+    desc = desc.replace("(cbc)", "").replace("bact/alert", "").strip()
+    
+    # Remove trailing numbers like "1", "2" from "Blood Culture 1"
+    desc = " ".join(w for w in desc.split() if not w.isdigit())
+    
+    # Remove parentheses content
+    if "(" in desc:
+        desc = desc.split("(")[0].strip()
+    
+    return desc.strip()
+
 def sanitize_metadata_field(value: Any, max_length: int = 200) -> str | None:
     """
     Sanitize metadata extracted from vision LLM.
@@ -575,8 +640,21 @@ class BillShieldAgent:
             if amount == 0:
                 continue
 
+            # Filter out low-value consumables and negative returns
+            if amount < 0:  # Negative returns (like -₹4.30)
+                print(f"⏭️  Skipping negative return: {description} (₹{amount})")
+                continue
+            
+            if amount < 50 and any(kw in description for kw in [
+                "blood colle", "blood tube", "edta", "syringe", "needle", 
+                "gauze", "cotton", "band", "gloves", "tube"
+            ]):
+                print(f"⏭️  Skipping low-value consumable: {description} (₹{amount})")
+                continue
+
             print(f"📝 Analyzing: {description} (₹{amount})")
             issue = None
+        
 
             # Drugs (NPPA benchmark)
             if any(kw in description for kw in ["medicine", "drug", "tablet", "syrup", "injection"]):
@@ -593,8 +671,24 @@ class BillShieldAgent:
                     "Challenge diagnostic charge using CGHS benchmark"
                 )
 
+           
             # Consultations (CGHS benchmark)
             elif any(kw in description for kw in ["consultation", "consultant", "doctor", "specialist", "visit"]):
+                # Skip if this looks like a duplicate (generic after specific)
+                # e.g., skip "IP Consultation" if we already saw "IP Consultation - Dr. Name"
+                base_consult = description.split(" - ")[0].strip()  # Get part before dash
+                
+                # Check if we already created an issue for this consultation type + amount
+                duplicate = any(
+                    i.description.lower().startswith(base_consult) and 
+                    i.billed_amount == amount 
+                    for i in issues
+                )
+                
+                if duplicate:
+                    print(f"  ⏭️  Skipping duplicate consultation: {description}")
+                    continue
+                
                 issue = self._check_cghs_overcharge(
                     item, bill_data, "CONSULT", "consultation",
                     "Challenge consultation charge using CGHS benchmark"
@@ -667,22 +761,60 @@ class BillShieldAgent:
         return best
 
     def _check_cghs_overcharge(
-        self, item: Dict, bill_data: Dict,
-        issue_prefix: str, benchmark_label: str, action_required: str,
+        self,
+        item: Dict,
+        bill_data: Dict,
+        issue_prefix: str,
+        benchmark_label: str,
+        action_template: str
     ) -> BillingIssue | None:
         """
         Confidence-weighted CGHS checker for ATOMIC items only.
-        Surgical sub-charges should NEVER reach this function.
-
-        HIGH (similarity >= 0.75): Clear match, claim overcharge.
-        MEDIUM (similarity 0.65-0.75): Possible match, verify first.
-        LOW (similarity < 0.65): Different item, request itemization.
         """
-        if not self.rag:
-            return None
-
         description = item.get("description", "")
         amount = item.get("amount", 0)
+
+        # Try hardcoded matcher first (high confidence)
+        normalized_desc = normalize_test_name(description)
+        cghs_rate = LAB_TEST_CGHS_RATES.get(normalized_desc)
+        
+        if cghs_rate:
+            print(f"✅ Hardcoded CGHS match: {normalized_desc} → ₹{cghs_rate}")
+            
+            # Only flag if billed significantly above CGHS
+            if amount <= cghs_rate * 1.5:  # 50% tolerance
+                return None
+            
+            self.issue_counter += 1
+            overcharge = amount - cghs_rate
+            
+            return BillingIssue(
+                issue_id=f"{issue_prefix}_{self.issue_counter:03d}",
+                issue_type=IssueType.PROCEDURE_OVERCHARGE,
+                description=f"{description} — {(amount / cghs_rate - 1) * 100:.0f}% above CGHS benchmark",
+                billed_amount=amount,
+                benchmark_amount=cghs_rate,
+                overcharge_amount=overcharge,
+                confidence=Confidence.HIGH,
+                evidence=[
+                    f"CGHS benchmark rate: ₹{cghs_rate:,.2f}",
+                    f"Billed amount: ₹{amount:,.2f}",
+                    f"Overcharge: ₹{overcharge:,.2f} ({(amount / cghs_rate - 1) * 100:.0f}% above)",
+                    "Exact test match in CGHS rate list"
+                ],
+                action_required=(
+                    f"Ask the hospital to justify this {benchmark_label} charge. "
+                    f"Reference CGHS benchmark rate of ₹{cghs_rate:,.2f}. "
+                    "Request itemized breakdown if this covers multiple tests."
+                ),
+                benchmark_type="CGHS",
+                match_quality=1.0,
+                matched_procedure=normalized_desc.title(),
+            )
+        
+        # Fall back to RAG fuzzy matching if no hardcoded match
+        if not self.rag:
+            return None
 
         benchmark = self._match_to_benchmark(item, bill_data)
         if not benchmark:
@@ -1176,7 +1308,61 @@ class BillShieldAgent:
 
         print(f"📊 Deduplication: {len(issues)} → {len(deduplicated)} issues")
         return deduplicated
-
+    def _group_lab_tests(self, issues: List[BillingIssue]) -> List[BillingIssue]:
+        """Group multiple lab test issues into one summary card."""
+        lab_issues = [i for i in issues if "blood" in i.description.lower() or 
+                      "urea" in i.description.lower() or "crp" in i.description.lower() or
+                      "culture" in i.description.lower() or "count" in i.description.lower()]
+        
+        if len(lab_issues) <= 2:
+            return issues  # Don't group if only 1-2 tests
+        
+        other_issues = [i for i in issues if i not in lab_issues]
+        
+        # Create grouped lab issue
+        total_lab_billed = sum(i.billed_amount for i in lab_issues)
+        total_lab_benchmark = sum(i.benchmark_amount or 0 for i in lab_issues if i.benchmark_amount)
+        
+        evidence = [f"Total laboratory charges: ₹{total_lab_billed:,.2f}"]
+        evidence.append(f"\nTests identified ({len(lab_issues)} items):")
+        
+        for i in lab_issues:
+            test_name = i.description.split(" —")[0]  # Remove suffix
+            if i.benchmark_amount:
+                evidence.append(
+                    f"  • {test_name}: ₹{i.billed_amount:,.2f} "
+                    f"(CGHS: ₹{i.benchmark_amount:,.2f})"
+                )
+            else:
+                evidence.append(f"  • {test_name}: ₹{i.billed_amount:,.2f} (no benchmark match)")
+        
+        if total_lab_benchmark > 0:
+            evidence.append(f"\nTotal CGHS benchmark: ₹{total_lab_benchmark:,.2f}")
+            evidence.append(f"Difference: ₹{total_lab_billed - total_lab_benchmark:,.2f}")
+        
+        self.issue_counter += 1
+        grouped_issue = BillingIssue(
+            issue_id=f"LAB_GROUP_{self.issue_counter:03d}",
+            issue_type=IssueType.MISSING_ITEMIZATION,
+            description=f"Laboratory tests — {len(lab_issues)} items for verification",
+            billed_amount=total_lab_billed,
+            benchmark_amount=total_lab_benchmark if total_lab_benchmark > 0 else None,
+            overcharge_amount=None,
+            confidence=Confidence.MEDIUM if total_lab_benchmark > 0 else Confidence.LOW,
+            evidence=evidence,
+            action_required=(
+                "Ask the hospital: "
+                "(1) Request itemized test codes for each lab test. "
+                "(2) Verify if any tests are bundled or part of a panel. "
+                "(3) Cross-check individual test rates against CGHS benchmarks."
+            ),
+            benchmark_type="CGHS",
+            match_quality=0.8 if total_lab_benchmark > 0 else 0.0,
+            matched_procedure="Laboratory Tests (Multiple)",
+        )
+        
+        return other_issues + [grouped_issue]
+    
     def _generate_result(
         self, bill_data: Dict, rejection_data: Dict | None, issues: List[BillingIssue],
     ) -> AnalysisResult:
