@@ -13,70 +13,6 @@ from src.agent.multi_procedure_detection import (
 )
 
 
-
-# Hardcoded CGHS lab test rates for common tests
-# Source: CGHS 2025 rate list
-LAB_TEST_CGHS_RATES = {
-    # Blood tests - Hematology
-    "complete blood count": 280,
-    "complete bloodcount": 280,
-    "cbc": 280,
-    "haemoglobin": 60,
-    "hemoglobin": 60,
-    "hb": 60,
-    "platelet count": 110,
-    "total wbc count": 80,
-    "differential count": 100,
-    "esr": 50,
-    
-    # Blood tests - Biochemistry
-    "blood urea": 100,
-    "urea": 100,
-    "creatinine": 100,
-    "blood sugar": 80,
-    "glucose fasting": 80,
-    "glucose random": 80,
-    "sodium": 125,
-    "potassium": 125,
-    "sodium & potassium": 250,
-    "sodium and potassium": 250,
-    
-    # Liver function
-    "lft": 440,
-    "liver function test": 440,
-    "sgot": 120,
-    "sgpt": 120,
-    "bilirubin total": 100,
-    
-    # Inflammatory markers
-    "crp": 280,
-    "c-reactive protein": 280,
-    
-    # Cultures
-    "blood culture": 750,
-    "urine culture": 400,
-    
-    # Consultations
-    "ip consultation": 1000,
-    "op consultation": 150,
-    "cross consultation": 150,
-}
-
-def normalize_test_name(description: str) -> str:
-    """Normalize lab test name for matching."""
-    # Remove common bill artifacts
-    desc = description.lower()
-    desc = desc.replace("(cbc)", "").replace("bact/alert", "").strip()
-    
-    # Remove trailing numbers like "1", "2" from "Blood Culture 1"
-    desc = " ".join(w for w in desc.split() if not w.isdigit())
-    
-    # Remove parentheses content
-    if "(" in desc:
-        desc = desc.split("(")[0].strip()
-    
-    return desc.strip()
-
 def sanitize_metadata_field(value: Any, max_length: int = 200) -> str | None:
     """
     Sanitize metadata extracted from vision LLM.
@@ -343,7 +279,8 @@ class BillShieldAgent:
 
         print(f"\n✅ Found {len(issues)} potential issues")
         issues = self._deduplicate_issues(issues)
-        issues = self._group_lab_tests(issues)  # ← ADD THIS LINE
+        issues = self._group_lab_tests(issues)
+        issues = self._validate_high_confidence_issues(issues, bill_data)
 
         result = self._generate_result(bill_data, rejection_data, issues)
 
@@ -431,96 +368,6 @@ class BillShieldAgent:
             )
 
         return episodes, atomic_items
-
-        # Group items by department/category
-        dept_groups = {}
-        for item in line_items:
-            desc = item.get("description", "").lower()
-            category = item.get("category", "").lower()
-            amount = item.get("amount", 0)
-
-            if amount == 0:
-                continue
-
-            # Identify which group this item belongs to
-            group_key = self._classify_item_for_episode(desc, category)
-            if group_key not in dept_groups:
-                dept_groups[group_key] = []
-            dept_groups[group_key].append(item)
-
-        episodes = []
-        atomic_items = []
-
-        for group_key, items in dept_groups.items():
-            group_type, group_label = group_key
-
-            if group_type == "surgical" and len(items) >= 2:
-                # Confirm it's a surgical episode (has at least one surgical keyword)
-                has_surgical_marker = any(
-                    any(kw in item.get("description", "").lower() for kw in SURGICAL_KEYWORDS)
-                    for item in items
-                )
-                if has_surgical_marker:
-                    episodes.append({
-                        "type": "surgical",
-                        "department": group_label,
-                        "items": items,
-                        "total": sum(i.get("amount", 0) for i in items),
-                    })
-                    continue
-
-            if group_type == "room_stay" and len(items) >= 2:
-                episodes.append({
-                    "type": "room_stay",
-                    "department": group_label,
-                    "items": items,
-                    "total": sum(i.get("amount", 0) for i in items),
-                })
-                continue
-
-            # Not an episode - add to atomic
-            atomic_items.extend(items)
-
-        return episodes, atomic_items
-
-    def _classify_item_for_episode(self, description: str, category: str) -> tuple[str, str]:
-        """
-        Classify an item to determine if it belongs to a surgical or room-stay episode.
-
-        Returns:
-            (episode_type, department_label) tuple as a group key.
-            episode_type: 'surgical', 'room_stay', or 'atomic'
-        """
-        desc = description.lower()
-
-        # Atomic checks first (highest priority - these are never grouped)
-        if any(kw in desc for kw in ATOMIC_KEYWORDS):
-            return ("atomic", desc)
-
-        # Surgical episode detection: looks for department prefix + surgical context
-        surgical_departments = [
-            "obs & gyne", "obs & gynecology", "obs & gayne", "obstetric", "gynecology",
-            "cardiology", "cardiac", "orthopedic", "ortho", "neurology", "neuro",
-            "general surgery", "surgery", "urology", "ent", "ophthalmology",
-        ]
-
-        for dept in surgical_departments:
-            if dept in desc:
-                # Check if this has surgical keywords or procedure category
-                if any(kw in desc for kw in SURGICAL_KEYWORDS) or "procedure" in category:
-                    return ("surgical", dept.upper())
-
-        # Room/ward stay episode detection
-        for room_kw in ROOM_KEYWORDS:
-            if room_kw in desc:
-                # Extract room type as label
-                for room_type in ["deluxe", "private", "icu", "ccu", "nicu", "general ward", "semi-private", "suite"]:
-                    if room_type in desc:
-                        return ("room_stay", room_type.upper())
-                return ("room_stay", "ROOM/WARD")
-
-        # Default: atomic (will be benchmarked individually)
-        return ("atomic", desc)
 
     def _create_episode_issue(self, episode: Dict, bill_data: Dict) -> BillingIssue | None:
         """Create a single grouped issue for a surgical or room-stay episode."""
@@ -654,16 +501,13 @@ class BillShieldAgent:
             if amount == 0:
                 continue
 
-            # Filter out low-value consumables and negative returns
-            if amount < 0:  # Negative returns (like -₹4.30)
+            # Filter out negative returns
+            if amount < 0:
                 print(f"⏭️  Skipping negative return: {description} (₹{amount})")
                 continue
 
-            # Don't skip consumables - they're legitimate line items
-            # The "garbage detection" happened earlier in vision parser, not here
             print(f"📝 Analyzing: {description} (₹{amount})")
             issue = None
-        
 
             # Drugs (NPPA benchmark)
             if any(kw in description for kw in ["medicine", "drug", "tablet", "syrup", "injection"]):
@@ -680,7 +524,6 @@ class BillShieldAgent:
                     "Challenge diagnostic charge using CGHS benchmark"
                 )
 
-           
             # Consultations (CGHS benchmark)
             elif any(kw in description for kw in ["consultation", "consultant", "doctor", "specialist", "visit"]):
                 # Skip if this looks like a duplicate (generic after specific)
@@ -779,49 +622,12 @@ class BillShieldAgent:
     ) -> BillingIssue | None:
         """
         Confidence-weighted CGHS checker for ATOMIC items only.
+        Uses RAG fuzzy matching against the full CGHS database.
         """
         description = item.get("description", "")
         amount = item.get("amount", 0)
 
-        # Try hardcoded matcher first (high confidence)
-        normalized_desc = normalize_test_name(description)
-        cghs_rate = LAB_TEST_CGHS_RATES.get(normalized_desc)
-        
-        if cghs_rate:
-            print(f"✅ Hardcoded CGHS match: {normalized_desc} → ₹{cghs_rate}")
-            
-            # Only flag if billed significantly above CGHS
-            if amount <= cghs_rate * 1.5:  # 50% tolerance
-                return None
-            
-            self.issue_counter += 1
-            overcharge = amount - cghs_rate
-            
-            return BillingIssue(
-                issue_id=f"{issue_prefix}_{self.issue_counter:03d}",
-                issue_type=IssueType.PROCEDURE_OVERCHARGE,
-                description=f"{description} — {(amount / cghs_rate - 1) * 100:.0f}% above CGHS benchmark",
-                billed_amount=amount,
-                benchmark_amount=cghs_rate,
-                overcharge_amount=overcharge,
-                confidence=Confidence.HIGH,
-                evidence=[
-                    f"CGHS benchmark rate: ₹{cghs_rate:,.2f}",
-                    f"Billed amount: ₹{amount:,.2f}",
-                    f"Overcharge: ₹{overcharge:,.2f} ({(amount / cghs_rate - 1) * 100:.0f}% above)",
-                    "Exact test match in CGHS rate list"
-                ],
-                action_required=(
-                    f"Ask the hospital to justify this {benchmark_label} charge. "
-                    f"Reference CGHS benchmark rate of ₹{cghs_rate:,.2f}. "
-                    "Request itemized breakdown if this covers multiple tests."
-                ),
-                benchmark_type="CGHS",
-                match_quality=1.0,
-                matched_procedure=normalized_desc.title(),
-            )
-        
-        # Fall back to RAG fuzzy matching if no hardcoded match
+        # Use RAG system for all CGHS matching
         if not self.rag:
             return None
 
@@ -1317,6 +1123,7 @@ class BillShieldAgent:
 
         print(f"📊 Deduplication: {len(issues)} → {len(deduplicated)} issues")
         return deduplicated
+
     def _group_lab_tests(self, issues: List[BillingIssue]) -> List[BillingIssue]:
         """Group multiple lab test issues into one summary card."""
         lab_issues = [i for i in issues if "blood" in i.description.lower() or 
@@ -1371,6 +1178,56 @@ class BillShieldAgent:
         )
         
         return other_issues + [grouped_issue]
+
+    def _validate_high_confidence_issues(
+        self, 
+        issues: List[BillingIssue], 
+        bill_data: Dict
+    ) -> List[BillingIssue]:
+        """
+        Validate every HIGH confidence issue against raw bill data.
+        Downgrade to MEDIUM if alignment can't be verified.
+        """
+        line_items = bill_data.get("line_items", [])
+        validated = []
+        
+        for issue in issues:
+            if issue.confidence != Confidence.HIGH:
+                validated.append(issue)
+                continue
+            
+            # Find matching source row
+            source_match = None
+            for line_item in line_items:
+                line_desc = line_item.get("description", "").lower()
+                line_amount = line_item.get("amount", 0)
+                
+                # Description must match (or be substring) AND amount must match
+                issue_desc_normalized = issue.description.lower().split(" —")[0].split(" significantly")[0].strip()
+                
+                if (issue_desc_normalized in line_desc or line_desc in issue_desc_normalized) \
+                   and abs(line_amount - issue.billed_amount) < 1.0:
+                    source_match = line_item
+                    break
+            
+            if not source_match:
+                # Can't verify - downgrade
+                print(f"⚠️ Downgrading {issue.issue_id}: description-amount pair not found in source")
+                issue.confidence = Confidence.MEDIUM
+                issue.evidence.append("⚠️ Auto-downgraded: source row could not be verified")
+            
+            # Sanity check: extreme overcharges may indicate extraction error
+            elif issue.benchmark_amount and issue.billed_amount > issue.benchmark_amount * 3:
+                print(f"⚠️ Downgrading {issue.issue_id}: amount >3x benchmark suggests possible extraction error")
+                issue.confidence = Confidence.MEDIUM
+                issue.evidence.append(
+                    f"⚠️ Auto-downgraded: billed amount is {issue.billed_amount / issue.benchmark_amount:.1f}x benchmark. "
+                    "Verify with hospital before disputing."
+                )
+            
+            validated.append(issue)
+        
+        return validated
     
     def _generate_result(
         self, bill_data: Dict, rejection_data: Dict | None, issues: List[BillingIssue],
@@ -1472,9 +1329,8 @@ class BillShieldAgent:
         if not recommendations:
             recommendations = ["No action needed at this time."]
 
-
-# Extract metadata from bill_data (handles both vision LLM and regex parser outputs)
-# Vision parser puts metadata at top level; regex parser puts it under 'header'
+        # Extract metadata from bill_data (handles both vision LLM and regex parser outputs)
+        # Vision parser puts metadata at top level; regex parser puts it under 'header'
         header = bill_data.get('header', {})
         return AnalysisResult(
             total_bill=total_bill,
