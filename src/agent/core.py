@@ -343,6 +343,7 @@ class BillShieldAgent:
 
         print(f"\n✅ Found {len(issues)} potential issues")
         issues = self._deduplicate_issues(issues)
+        issues = self._group_lab_tests(issues)  # ← ADD THIS LINE
 
         result = self._generate_result(bill_data, rejection_data, issues)
 
