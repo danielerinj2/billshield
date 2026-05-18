@@ -2001,31 +2001,23 @@
                 </p>
             </div>
             <div class="footer-section">
-                <h4>Product</h4>
-                <a href="#how-it-works">How It Works</a>
-                <a href="#what-we-flag">What We Flag</a>
-                <a href="#">Sample Report</a>
-                <a href="#" onclick="showPage('upload'); return false;">Upload a Bill</a>
-                <a href="#">Pricing</a>
-            </div>
-            <div class="footer-section">
                 <h4>Legal</h4>
-                <a href="#">Privacy Policy</a>
-                <a href="#">Terms of Service</a>
-                <a href="#">IRDAI Compliance</a>
-                <a href="#">Data Retention</a>
+                <a href="privacy-policy.html">Privacy Policy</a>
+                <a href="terms-of-service.html">Terms of Service</a>
+                <a href="irdai-compliance.html">IRDAI Compliance</a>
+                <a href="data-retention.html">Data Retention</a>
             </div>
         </div>
         <div class="disclaimer">
             <strong>Disclaimer:</strong> BillShield provides information and analysis tools for medical billing review. We are not a law firm and do not provide legal advice. We are not a healthcare provider and do not provide medical advice. All benchmark data is sourced from publicly available government databases and updated quarterly. Individual results vary based on hospital policies and insurer terms.
         </div>
     </footer>
-
     <script>
         // Global state
         let uploadedFiles = [];   // array of { file, docType } — up to 5
         let selectedTone = 'professional';
         const MAX_FILES = 5;
+        function classifyByFilename(name) {
 
         function classifyByFilename(name) {
             const n = name.toLowerCase();
