@@ -7,7 +7,7 @@ from src.scripts.multi_bill_detector import detect_multi_bill
 from pathlib import Path
 from typing import List
 
-from fastapi import APIRouter, HTTPException, Depends, File, UploadFile, Form
+from fastapi import APIRouter, HTTPException, Depends, File, UploadFile, Form, Request
 from fastapi.responses import JSONResponse
 from supabase import Client
 
@@ -163,20 +163,27 @@ ALLOWED_MIME_TYPES = [
 IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'tiff', 'tif', 'bmp', 'webp']
 
 
+
+    
 @router.post("/analysis/create")
 async def create_analysis(
     data: AnalysisCreate,
-    db: Client = Depends(get_db)
+    db: Client = Depends(get_db),
+    request: Request = None
 ):
     """Create a new analysis record."""
     try:
+        # Extract session token from header (sent by frontend)
+        session_token = request.headers.get("X-Session-Token") if request else None
+        
         result = db.table('analyses').insert({
             'status': 'processing',
             'patient_name': data.patient_name,
             'hospital_name': data.hospital_name,
             'bill_number': data.bill_number,
             'policy_number': data.policy_number,
-            'claim_number': data.claim_number
+            'claim_number': data.claim_number,
+            'session_token': session_token  # NEW: track anonymous sessions
         }).execute()
         
         analysis_id = result.data[0]['id']
