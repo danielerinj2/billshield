@@ -2571,9 +2571,13 @@ function stopQuirkyMessages() {
 
 async function createAnalysis(patientName) {
     try {
+        const sessionToken = getOrCreateSessionToken();
         const response = await fetch(`${API_URL}/api/analysis/create`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-Session-Token': sessionToken
+            },
             body: JSON.stringify({ patient_name: patientName })
         });
         const data = await response.json();
