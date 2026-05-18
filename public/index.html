@@ -1479,11 +1479,11 @@
     <!-- Navigation -->
     <nav>
         <div class="nav-container">
-            <div class="logo">BillShield</div>
+            <div class="logo" onclick="showPage('landing')" style="cursor: pointer;">BillShield</div>
             <div class="nav-links">
-                <a href="#how-it-works">How It Works</a>
-                <a href="#what-we-flag">What We Flag</a>
-                <a href="#faq">FAQ</a>
+                <a href="#" onclick="showPage('landing'); setTimeout(() => document.getElementById('how-it-works')?.scrollIntoView({behavior: 'smooth'}), 100); return false;">How It Works</a>
+                <a href="#" onclick="showPage('landing'); setTimeout(() => document.getElementById('what-we-flag')?.scrollIntoView({behavior: 'smooth'}), 100); return false;">What We Flag</a>
+                <a href="#" onclick="showPage('landing'); setTimeout(() => document.getElementById('faq')?.scrollIntoView({behavior: 'smooth'}), 100); return false;">FAQ</a>
             </div>
             <div id="navAuthButtons" class="nav-auth"></div>
         </div>      
