@@ -1,4 +1,3 @@
-cat > src/letters/generator.py << 'PYEOF'
 """
 Adaptive Letter Generator - dynamically builds letters based on detected issues.
 Improved for Indian medical billing context with calibrated, evidence-based language.
@@ -468,4 +467,4 @@ def generate_all_letters(analysis_result_path: Path, output_dir: Path, tone: Ton
     hospital_letter = generator.generate_hospital_letter(tone=tone)
     (output_dir / 'hospital_objection_letter.txt').write_text(hospital_letter)
     print(f"Generated hospital letter ({tone} tone)")
-PYEOF
+    
