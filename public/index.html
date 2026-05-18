@@ -2726,7 +2726,7 @@ window.handleUpload = async function(event) {
         updateStatus('Analyzing against 8,047 benchmarks...');
         const results = await waitForResults(analysisId, (progress) => { updateProgress(progress); });
 
-        // Check if user needs to sign up before viewing results
+       // Check if user needs to sign up before viewing results
         const gateShown = await maybeShowAuthGate(analysisId, results);
         if (gateShown) {
             // User needs to sign up - stop here, modal will reload page on success
@@ -2734,7 +2734,10 @@ window.handleUpload = async function(event) {
             return;
         }
         
-        // User is logged in - show results
+        // User is logged in - claim any anonymous analyses (handles case where user logged in before uploading)
+        await claimAnonymousAnalyses();
+        
+        // Show results
         displayResults(results);
         window.currentAnalysisId = analysisId;
         stopQuirkyMessages();
