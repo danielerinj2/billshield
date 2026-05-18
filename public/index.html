@@ -2511,8 +2511,8 @@ async function maybeShowAuthGate(analysisId, analysisData) {
     if (user) return false;
     
     const issuesCount = (analysisData?.issues || []).length;
-    const billTotal = analysisData?.bill_total || analysisData?.total_bill || 0;
-    const hospitalName = analysisData?.hospital_name;
+    const billTotal = analysisData?.analysis?.bill_total || analysisData?.bill_total || 0;
+    const hospitalName = analysisData?.analysis?.hospital_name || analysisData?.hospital_name;
     
     openAuthModal('signup', 'gate', {
         bill_total: billTotal,
