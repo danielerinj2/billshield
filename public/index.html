@@ -2399,7 +2399,6 @@ async function claimAnonymousAnalyses() {
     
     const { data, error } = await supabaseClient.rpc('claim_anonymous_analyses', {
         p_session_token: sessionToken,
-        p_user_id: user.id,
     });
     
     if (error) {
