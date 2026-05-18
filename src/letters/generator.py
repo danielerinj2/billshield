@@ -1,5 +1,7 @@
+cat > src/letters/generator.py << 'PYEOF'
 """
 Adaptive Letter Generator - dynamically builds letters based on detected issues.
+Improved for Indian medical billing context with calibrated, evidence-based language.
 """
 
 import json
@@ -17,12 +19,6 @@ class AdaptiveLetterGenerator:
     """Generates letters that adapt to detected issues."""
     
     def __init__(self, analysis_result: Dict):
-        """
-        Initialize with agent analysis result.
-        
-        Args:
-            analysis_result: Output from BillShieldAgent.analyze()
-        """
         self.analysis = analysis_result
         self.available_sections = SectionLibrary.get_all_sections()
     
@@ -33,103 +29,150 @@ class AdaptiveLetterGenerator:
         hospital_name: str = "[Hospital Name]",
         bill_number: str = "[Bill Number]"
     ) -> str:
-        """Generate hospital objection letter with only relevant sections."""
+        """Generate hospital letter calibrated to Indian billing context."""
         
-        # Header
         parts = []
-        parts.append("HOSPITAL BILLING OBJECTION LETTER")
+        parts.append("REQUEST FOR REVIEW AND RECTIFICATION OF HOSPITAL BILL")
         parts.append("=" * 60)
         parts.append("")
         parts.append(f"Date: {datetime.now().strftime('%B %d, %Y')}")
         parts.append(f"Patient Name: {patient_name}")
         parts.append(f"Bill Number: {bill_number}")
-        parts.append(f"Total Bill Amount: ₹{self.analysis.get('total_bill', 0):,.0f}")
+        parts.append(f"Total Bill Amount: Rs. {self.analysis.get('total_bill', 0):,.0f}")
         parts.append("")
-        parts.append(f"To: Billing Department")
+        parts.append(f"To: The Billing Department")
         parts.append(f"{hospital_name}")
         parts.append("")
-        parts.append("Subject: Objection to Billing Charges - Overcharges Detected")
+        parts.append(f"Subject: Request for Review and Rectification of Bill No. {bill_number}")
         parts.append("")
         
-        # Greeting based on tone
+        # Opening
         if tone == 'polite':
-            greeting = "Dear Sir/Madam,\n\nI hope this letter finds you well. I am writing regarding some concerns with my recent hospital bill."
+            parts.append("Dear Sir/Madam,")
+            parts.append("")
+            parts.append(
+                "Thank you for the care provided during my treatment. After reviewing "
+                "my hospital bill, I have identified a few items that require review "
+                "and clarification. I am writing to request your assistance in resolving these."
+            )
         elif tone == 'firm':
-            greeting = "Dear Sir/Madam,\n\nI am writing to formally object to significant overcharges in the referenced hospital bill."
+            parts.append("Dear Sir/Madam,")
+            parts.append("")
+            parts.append(
+                "I am writing to formally request a review and rectification of the "
+                "above-referenced hospital bill. Specific charges appear to exceed "
+                "applicable benchmarks and require itemized justification."
+            )
         else:
-            greeting = "Dear Sir/Madam,\n\nI am writing to object to certain charges in the above-referenced hospital bill."
-        
-        parts.append(greeting)
+            parts.append("Dear Sir/Madam,")
+            parts.append("")
+            parts.append(
+                "After a careful review of the above-referenced bill, I have identified "
+                "items that require justification or correction. I am writing to formally "
+                "request a review under your standard billing grievance process."
+            )
         parts.append("")
         
-        # Add applicable sections
-        applicable_sections = self._get_applicable_sections()
+        # Separate issues by confidence
+        issues = self.analysis.get('issues', [])
+        high_conf = [i for i in issues if i.get('confidence') == 'high']
+        medium_conf = [i for i in issues if i.get('confidence') == 'medium']
+        low_conf = [i for i in issues if i.get('confidence') == 'low']
         
-        if not applicable_sections:
-            parts.append("No overcharges detected.")
-        else:
-            parts.append("VERIFIED OVERCHARGES:")
+        # SECTION 1: Verified overcharges (high confidence only)
+        if high_conf:
+            parts.append("SECTION A — CHARGES REQUIRING IMMEDIATE RECTIFICATION:")
+            parts.append("(These items appear to exceed published benchmarks)")
             parts.append("")
-            
-            for section in sorted(applicable_sections, key=lambda s: s.priority, reverse=True):
-                content = section.content_builder(self.analysis, tone)
-                parts.append(f"## {section.title}")
-                parts.append(content)
+            for idx, issue in enumerate(high_conf, 1):
+                desc = issue.get('description', '').replace(' (illegal)', '').replace(' charged above MRP', ' — exceeds reference price')
+                overcharge = issue.get('overcharge_amount', 0)
+                benchmark = issue.get('benchmark_amount')
+                billed = issue.get('billed_amount', 0)
+                
+                parts.append(f"{idx}. {desc}")
+                parts.append(f"   Billed: Rs. {billed:,.2f}")
+                if benchmark:
+                    parts.append(f"   Reference benchmark: Rs. {benchmark:,.2f}")
+                parts.append(f"   Excess over reference: Rs. {overcharge:,.2f}")
                 parts.append("")
             
-            confidence_language = self._build_confidence_based_language()
-            if confidence_language:
-                parts.append("CONFIDENCE-BASED REQUESTS:")
-                parts.append(confidence_language)
-                parts.append("")
-        
-        # Regulatory references (only ones actually cited)
-        refs = self._build_regulatory_references()
-        if refs:
-            parts.append("REGULATORY REFERENCES:")
-            parts.append(refs)
+            total_high = sum(i.get('overcharge_amount', 0) for i in high_conf)
+            parts.append(f"Subtotal of charges requiring rectification: Rs. {total_high:,.2f}")
             parts.append("")
         
-        # Closing based on tone
-        verified_total = self.analysis.get('total_verified_overcharge', 0)
+        # SECTION 2: Items needing clarification (medium + low confidence)
+        clarification_items = medium_conf + low_conf
+        if clarification_items:
+            parts.append("SECTION B — ITEMS REQUIRING CLARIFICATION:")
+            parts.append("(These charges could not be fully reconciled against available benchmarks)")
+            parts.append("")
+            for idx, issue in enumerate(clarification_items, 1):
+                desc = issue.get('description', '')
+                billed = issue.get('billed_amount', 0)
+                parts.append(f"{idx}. {desc}")
+                if billed:
+                    parts.append(f"   Billed: Rs. {billed:,.2f}")
+                parts.append("")
+            
+            # ONE consolidated request instead of repeating per item
+            parts.append("For the items in Section B, kindly provide:")
+            parts.append("   a) The exact item/procedure name and applicable tariff code")
+            parts.append("   b) The hospital's published tariff or MRP/NPPA reference (where applicable)")
+            parts.append("   c) Pack size, batch, and GST treatment (for medicines/consumables)")
+            parts.append("   d) A breakdown if charged as part of a package")
+            parts.append("")
         
-        parts.append("REQUESTED ACTION:")
-        if tone == 'polite':
-            parts.append(f"I kindly request a review of the above charges. Please provide:")
-        elif tone == 'firm':
-            parts.append(f"I demand immediate correction of the above overcharges. Provide:")
-        else:
-            parts.append(f"I request an immediate review. Please provide:")
-        
-        parts.append("1. Revised bill with corrected amounts")
-        parts.append("2. Written justification for any charges you believe are correct")
-        parts.append(f"3. Refund of ₹{verified_total:,.0f} within 15 days")
+        # Documents requested
+        parts.append("DOCUMENTS REQUESTED:")
+        parts.append("")
+        parts.append("Please provide the following within 15 days:")
+        parts.append("1. A fully itemized bill with tariff/procedure codes for each line item")
+        parts.append("2. Written justification for any charges retained as billed")
+        parts.append("3. A corrected bill reflecting any agreed adjustments")
+        parts.append("4. Refund or credit note for any confirmed excess charges")
         parts.append("")
         
+        # Escalation path
+        parts.append("ESCALATION:")
+        parts.append("")
         if tone == 'firm':
-            parts.append("Failure to address these overcharges will result in escalation to the consumer forum.")
+            parts.append("If this matter is not resolved within 15 days, I will escalate to:")
         else:
-            parts.append("I am prepared to escalate this matter if the overcharges are not addressed.")
+            parts.append("If unresolved within 15 days, I reserve the right to escalate to:")
+        parts.append("   - The hospital's grievance redressal officer")
+        parts.append("   - My insurer's grievance cell (if claim is involved)")
+        parts.append("   - District Consumer Disputes Redressal Commission")
+        parts.append("   - State Health Authority under the Clinical Establishments Act (where applicable)")
+        parts.append("   - IRDAI Bima Bharosa portal (for insurance-linked disputes)")
+        parts.append("")
         
+        # Closing
+        parts.append(
+            "I appreciate your prompt attention to this matter. I am happy to provide "
+            "any additional documentation needed to facilitate the review."
+        )
         parts.append("")
         parts.append("Yours sincerely,")
+        parts.append("")
+        parts.append("")
         parts.append(patient_name)
         parts.append("")
+        parts.append("Enclosures: Copy of original bill, BillShield analysis report")
+        parts.append("")
         parts.append("---")
-        parts.append("Generated by BillShield Medical Bill Auditor")
+        parts.append("Note: Reference price comparisons are based on publicly available CGHS, NPPA, and MRP data.")
+        parts.append("This letter is a request for review and not a legal determination of wrongdoing.")
         
         return "\n".join(parts)
+    
     def generate_hospital_clarification_letter(
         self,
         patient_name: str = "[Patient Name]",
         hospital_name: str = "[Hospital Name]",
         bill_number: str = "[Bill Number]"
     ) -> str:
-        """Generate POLITE clarification request when issues are low-confidence.
-        
-        Used when no overcharges are confirmed but items need clarification.
-        Tone: professional, question-based, NOT confrontational.
-        """
+        """Polite clarification request for low-confidence issues only."""
         
         parts = []
         parts.append("REQUEST FOR BILL CLARIFICATION")
@@ -138,186 +181,54 @@ class AdaptiveLetterGenerator:
         parts.append(f"Date: {datetime.now().strftime('%B %d, %Y')}")
         parts.append(f"Patient Name: {patient_name}")
         parts.append(f"Bill Number: {bill_number}")
-        parts.append(f"Total Bill Amount: ₹{self.analysis.get('total_bill', 0):,.0f}")
+        parts.append(f"Total Bill Amount: Rs. {self.analysis.get('total_bill', 0):,.0f}")
         parts.append("")
-        parts.append(f"To: Billing Department")
+        parts.append(f"To: The Billing Department")
         parts.append(f"{hospital_name}")
         parts.append("")
-        parts.append("Subject: Request for Clarification on Bill " + bill_number)
+        parts.append(f"Subject: Request for Clarification on Bill No. {bill_number}")
         parts.append("")
         parts.append("Dear Sir/Madam,")
         parts.append("")
         parts.append(
             "Thank you for the medical care provided. I am writing to request "
-            "clarification on a few items in my bill before I complete my records. "
-            "These are not allegations of incorrect billing — I simply need additional "
-            "details to understand the charges and reconcile them with my insurance "
-            "documentation and personal records."
+            "clarification on a few items in my bill for my personal records and "
+            "potential insurance reimbursement. This is not an allegation of incorrect "
+            "billing — I simply need item-level details to reconcile the charges."
         )
         parts.append("")
         
-        # Build clarification questions from low/medium confidence issues
         issues = self.analysis.get('issues', [])
-        clarification_issues = [
-            i for i in issues 
-            if i.get('confidence') in ['low', 'medium']
-        ]
+        clarification_issues = [i for i in issues if i.get('confidence') in ['low', 'medium']]
         
         if clarification_issues:
             parts.append("ITEMS REQUIRING CLARIFICATION:")
             parts.append("")
-            
             for idx, issue in enumerate(clarification_issues, 1):
                 desc = issue.get('description', '')
-                amount = issue.get('overcharge_amount', 0) or issue.get('billed_amount', 0)
-                
+                billed = issue.get('billed_amount', 0)
                 parts.append(f"{idx}. {desc}")
-                if amount > 0:
-                    parts.append(f"   Amount in question: ₹{amount:,.0f}")
-                
-                # Include evidence as context
-                evidence = issue.get('evidence', [])
-                if evidence:
-                    parts.append("   Context from bill:")
-                    for ev in evidence[:3]:
-                        parts.append(f"   - {ev}")
-                
+                if billed:
+                    parts.append(f"   Amount: Rs. {billed:,.2f}")
                 parts.append("")
-                parts.append("   Could you please provide:")
-                parts.append("   a) The exact procedure name and standard procedure code")
-                parts.append("   b) Whether this is a fixed package and the standard package rate")
-                parts.append("   c) A breakdown of what services are included in this charge")
-                parts.append("   d) Your hospital's published tariff for this item")
-                parts.append("")
-        
-        parts.append("REASON FOR THIS REQUEST:")
-        parts.append("")
-        parts.append(
-            "I am reviewing my bill carefully as part of standard record-keeping "
-            "and for potential future insurance reimbursement. Having the procedure "
-            "codes and tariff details on record will help me:"
-        )
-        parts.append("- Maintain accurate medical and financial records")
-        parts.append("- Submit complete documentation to my insurer if needed")
-        parts.append("- Compare charges against standard benchmarks for my own reference")
-        parts.append("")
-        
-        parts.append("REQUESTED ACTION:")
-        parts.append("")
-        parts.append("Kindly provide the above details in writing within 14 days. ")
-        parts.append("A signed and stamped copy on hospital letterhead, sent by email or post, would be appreciated.")
-        parts.append("")
-        parts.append(
-            "I appreciate your time in helping me understand my bill. Please feel free "
-            "to contact me if any clarification is needed from my end."
-        )
-        parts.append("")
-        parts.append("Yours sincerely,")
-        parts.append(patient_name)
-        parts.append("")
-        parts.append("---")
-        parts.append("Generated by BillShield Medical Bill Auditor")
-        
-        return "\n".join(parts)
-
-    def generate_hospital_clarification_letter(
-        self,
-        patient_name: str = "[Patient Name]",
-        hospital_name: str = "[Hospital Name]",
-        bill_number: str = "[Bill Number]"
-    ) -> str:
-        """Generate POLITE clarification request when issues are low-confidence.
-        
-        Used when no overcharges are confirmed but items need clarification.
-        Tone: professional, question-based, NOT confrontational.
-        """
-        
-        parts = []
-        parts.append("REQUEST FOR BILL CLARIFICATION")
-        parts.append("=" * 60)
-        parts.append("")
-        parts.append(f"Date: {datetime.now().strftime('%B %d, %Y')}")
-        parts.append(f"Patient Name: {patient_name}")
-        parts.append(f"Bill Number: {bill_number}")
-        parts.append(f"Total Bill Amount: ₹{self.analysis.get('total_bill', 0):,.0f}")
-        parts.append("")
-        parts.append(f"To: Billing Department")
-        parts.append(f"{hospital_name}")
-        parts.append("")
-        parts.append("Subject: Request for Clarification on Bill " + bill_number)
-        parts.append("")
-        parts.append("Dear Sir/Madam,")
-        parts.append("")
-        parts.append(
-            "Thank you for the medical care provided. I am writing to request "
-            "clarification on a few items in my bill before I complete my records. "
-            "These are not allegations of incorrect billing — I simply need additional "
-            "details to understand the charges and reconcile them with my insurance "
-            "documentation and personal records."
-        )
-        parts.append("")
-        
-        # Build clarification questions from low/medium confidence issues
-        issues = self.analysis.get('issues', [])
-        clarification_issues = [
-            i for i in issues 
-            if i.get('confidence') in ['low', 'medium']
-        ]
-        
-        if clarification_issues:
-            parts.append("ITEMS REQUIRING CLARIFICATION:")
+            
+            parts.append("For each of the above items, kindly provide:")
+            parts.append("   a) The exact procedure/item name and tariff/procedure code")
+            parts.append("   b) Whether this is a packaged charge and the package contents")
+            parts.append("   c) Your hospital's published tariff for the item")
+            parts.append("   d) Pack size and GST treatment (for medicines/consumables)")
             parts.append("")
-            
-            for idx, issue in enumerate(clarification_issues, 1):
-                desc = issue.get('description', '')
-                amount = issue.get('overcharge_amount', 0) or issue.get('billed_amount', 0)
-                
-                parts.append(f"{idx}. {desc}")
-                if amount > 0:
-                    parts.append(f"   Amount in question: ₹{amount:,.0f}")
-                
-                # Include evidence as context
-                evidence = issue.get('evidence', [])
-                if evidence:
-                    parts.append("   Context from bill:")
-                    for ev in evidence[:3]:
-                        parts.append(f"   - {ev}")
-                
-                parts.append("")
-                parts.append("   Could you please provide:")
-                parts.append("   a) The exact procedure name and standard procedure code")
-                parts.append("   b) Whether this is a fixed package and the standard package rate")
-                parts.append("   c) A breakdown of what services are included in this charge")
-                parts.append("   d) Your hospital's published tariff for this item")
-                parts.append("")
-        
-        parts.append("REASON FOR THIS REQUEST:")
-        parts.append("")
-        parts.append(
-            "I am reviewing my bill carefully as part of standard record-keeping "
-            "and for potential future insurance reimbursement. Having the procedure "
-            "codes and tariff details on record will help me:"
-        )
-        parts.append("- Maintain accurate medical and financial records")
-        parts.append("- Submit complete documentation to my insurer if needed")
-        parts.append("- Compare charges against standard benchmarks for my own reference")
-        parts.append("")
         
         parts.append("REQUESTED ACTION:")
         parts.append("")
-        parts.append("Kindly provide the above details in writing within 14 days. ")
-        parts.append("A signed and stamped copy on hospital letterhead, sent by email or post, would be appreciated.")
+        parts.append("Kindly provide these details in writing within 14 days, ideally on")
+        parts.append("hospital letterhead via email or post.")
         parts.append("")
-        parts.append(
-            "I appreciate your time in helping me understand my bill. Please feel free "
-            "to contact me if any clarification is needed from my end."
-        )
+        parts.append("Thank you for your assistance.")
         parts.append("")
         parts.append("Yours sincerely,")
-        parts.append(patient_name)
         parts.append("")
-        parts.append("---")
-        parts.append("Generated by BillShield Medical Bill Auditor")
+        parts.append(patient_name)
         
         return "\n".join(parts)
     
@@ -329,10 +240,10 @@ class AdaptiveLetterGenerator:
         policy_number: str = "[Policy Number]",
         claim_number: str = "[Claim Number]"
     ) -> str:
-        """Generate insurer escalation letter for invalid rejections."""
+        """Insurer escalation letter aligned with IRDAI grievance process."""
         
         parts = []
-        parts.append("INSURANCE CLAIM ESCALATION LETTER")
+        parts.append("INSURANCE CLAIM GRIEVANCE — ESCALATION")
         parts.append("=" * 60)
         parts.append("")
         parts.append(f"Date: {datetime.now().strftime('%B %d, %Y')}")
@@ -340,21 +251,36 @@ class AdaptiveLetterGenerator:
         parts.append(f"Claim Number: {claim_number}")
         parts.append(f"Policyholder: {patient_name}")
         parts.append("")
-        parts.append(f"To: Grievance Redressal Officer")
+        parts.append(f"To: The Grievance Redressal Officer")
         parts.append(f"{insurer_name}")
         parts.append("")
-        parts.append("Subject: Escalation of Claim Rejection - IRDAI Regulation Violations")
+        parts.append("Subject: Escalation of Claim Settlement — Request for Review under IRDAI Guidelines")
         parts.append("")
         
-        # Greeting based on tone
         if tone == 'polite':
-            greeting = "Dear Sir/Madam,\n\nI am writing to request a review of my claim rejection."
+            parts.append("Dear Sir/Madam,")
+            parts.append("")
+            parts.append(
+                "I am writing to respectfully request a review of my claim settlement. "
+                "Certain deductions or rejections do not appear consistent with my policy "
+                "terms or applicable IRDAI guidelines."
+            )
         elif tone == 'firm':
-            greeting = "Dear Sir/Madam,\n\nI am escalating the rejection of my health insurance claim due to violations of IRDAI regulations."
+            parts.append("Dear Sir/Madam,")
+            parts.append("")
+            parts.append(
+                "I am formally escalating concerns regarding my claim settlement. "
+                "Several items appear inconsistent with my policy terms and IRDAI's "
+                "Protection of Policyholders' Interests Regulations."
+            )
         else:
-            greeting = "Dear Sir/Madam,\n\nI am writing to escalate the rejection of my claim based on IRDAI regulation concerns."
-        
-        parts.append(greeting)
+            parts.append("Dear Sir/Madam,")
+            parts.append("")
+            parts.append(
+                "I am writing to escalate concerns regarding my claim settlement. "
+                "Certain rejected or short-paid items require review against my policy "
+                "terms and IRDAI's regulatory framework."
+            )
         parts.append("")
         
         # Financial summary
@@ -362,107 +288,78 @@ class AdaptiveLetterGenerator:
         approved = self.analysis.get('total_approved', 0)
         rejected = self.analysis.get('total_rejected', 0)
         
-        parts.append("CLAIM DETAILS:")
-        parts.append(f"Total Claim Amount: ₹{total_claim:,.0f}")
-        parts.append(f"Amount Approved: ₹{approved:,.0f}")
-        parts.append(f"Amount Rejected: ₹{rejected:,.0f}")
+        parts.append("CLAIM SUMMARY:")
+        parts.append(f"   Total Claim Amount: Rs. {total_claim:,.0f}")
+        parts.append(f"   Amount Approved:    Rs. {approved:,.0f}")
+        parts.append(f"   Amount Rejected:    Rs. {rejected:,.0f}")
         parts.append("")
         
-        # Only show rejection-related issues
         rejection_issues = [
             i for i in self.analysis.get('issues', [])
             if i.get('issue_type') in ['rejection_invalid', 'rejection_delayed', 'policy_violation']
         ]
         
         if rejection_issues:
-            parts.append("IRDAI REGULATION VIOLATIONS:")
+            parts.append("ITEMS REQUIRING REVIEW:")
             parts.append("")
-            
-            for issue in rejection_issues:
+            for idx, issue in enumerate(rejection_issues, 1):
                 desc = issue.get('description', '')
                 amount = issue.get('overcharge_amount', 0)
                 evidence = issue.get('evidence', [])
                 
-                parts.append(f"• {desc}")
+                parts.append(f"{idx}. {desc}")
                 if amount > 0:
-                    parts.append(f"  Amount: ₹{amount:,.0f}")
-                
-                # Include key evidence points
+                    parts.append(f"   Amount: Rs. {amount:,.0f}")
                 for ev in evidence[:2]:
-                    parts.append(f"  - {ev}")
-                
+                    parts.append(f"   - {ev}")
                 parts.append("")
-            
-            total_recoverable = sum(i.get('overcharge_amount', 0) for i in rejection_issues)
-            parts.append(f"Total potentially recoverable from invalid rejections: ₹{total_recoverable:,.0f}")
-            parts.append("")
         
-        # Regulatory references
-        parts.append("IRDAI REGULATORY REFERENCES:")
-        parts.append("- IRDAI Master Circular on Health Insurance Business (2024)")
-        parts.append("- IRDAI (Protection of Policyholders' Interests) Regulations")
-        parts.append("- Insurance Act, 1938 - Section 45 (Moratorium Period)")
+        parts.append("REGULATORY FRAMEWORK:")
+        parts.append("   - IRDAI (Protection of Policyholders' Interests) Regulations, 2017")
+        parts.append("   - IRDAI Master Circular on Health Insurance Business, 2024")
+        parts.append("   - My policy terms and conditions (copy enclosed)")
         parts.append("")
         
-        # Requested action
         parts.append("REQUESTED ACTION:")
-        if tone == 'polite':
-            parts.append("I kindly request:")
-        elif tone == 'firm':
-            parts.append("I demand the following within 7 days:")
-        else:
-            parts.append("I request:")
-        
-        parts.append("1. Immediate review of rejected items against IRDAI non-payable list")
-        parts.append("2. Re-approval of unjustified rejections")
-        parts.append("3. Written explanation for any timeline violations")
-        parts.append("4. Settlement within IRDAI-mandated timelines")
+        parts.append("")
+        parts.append("Within 15 working days, kindly provide:")
+        parts.append("1. Itemized basis for each rejection or deduction")
+        parts.append("2. Reference to the specific policy clause invoked")
+        parts.append("3. Settlement of items that do not have a valid policy basis")
+        parts.append("4. A written response confirming the outcome")
         parts.append("")
         
-        # Escalation warning
-        if tone == 'firm':
-            parts.append("If this matter is not resolved within 14 days, I will:")
-        else:
-            parts.append("If unresolved within 14 days, I will escalate to:")
-        
-        parts.append("- Insurance Ombudsman")
-        parts.append("- IRDAI Integrated Grievance Management System (IGMS)")
-        parts.append("- Bima Bharosa portal")
+        parts.append("ESCALATION PATH:")
         parts.append("")
-        
+        parts.append("If this matter is not satisfactorily resolved within 15 working days, I will escalate to:")
+        parts.append("   - IRDAI Integrated Grievance Management System (IGMS)")
+        parts.append("   - Bima Bharosa portal (bimabharosa.irdai.gov.in)")
+        parts.append("   - The Insurance Ombudsman for my region")
+        parts.append("")
+        parts.append("Thank you for your prompt attention to this matter.")
+        parts.append("")
         parts.append("Yours sincerely,")
-        parts.append(patient_name)
         parts.append("")
-        parts.append("---")
-        parts.append("Generated by BillShield Medical Bill Auditor")
+        parts.append(patient_name)
         
         return "\n".join(parts)
-
+    
     def generate_patient_summary(
         self,
         patient_name: str = "[Patient Name]",
         scenario: str = "A_cash_clarification"
     ) -> str:
-        """Generate executive summary tailored to the user's scenario.
-        
-        Scenarios:
-            A_cash_clarification: No insurance, low-confidence issues only
-            B_cash_objection: No insurance, confirmed overcharges
-            C_insurance_dispute: Insurance involved, claim issues
-            D_hospital_overcharge_only: Insurance involved, only hospital overcharges
-        """
+        """Patient-facing summary with action plan."""
         
         parts = []
         parts.append("BILLSHIELD ANALYSIS REPORT")
         parts.append("=" * 70)
         parts.append("")
         parts.append(
-            "This report compares your bill against government benchmarks "
-            "(CGHS, NPPA, MRP). These are evidence and negotiation tools, "
-            "not legal judgments."
+            "This report compares your bill against publicly available government "
+            "benchmarks (CGHS, NPPA, MRP). It is intended as evidence for negotiation "
+            "and is not a legal determination."
         )
-        parts.append("")
-        parts.append("=" * 70)
         parts.append("")
         parts.append(f"Patient: {patient_name}")
         parts.append(f"Analysis Date: {datetime.now().strftime('%B %d, %Y')}")
@@ -470,242 +367,105 @@ class AdaptiveLetterGenerator:
         parts.append("=" * 70)
         parts.append("")
         
-        # Financial overview
         total_bill = self.analysis.get('total_bill', 0)
-        approved = self.analysis.get('total_approved', 0)
-        rejected = self.analysis.get('total_rejected', 0)
-        liability = self.analysis.get('total_patient_liability', 0) or total_bill
         verified = self.analysis.get('total_verified_overcharge', 0)
-        
-        min_rec = self.analysis.get('estimated_recoverable', {}).get('min', 0)
-        max_rec = self.analysis.get('estimated_recoverable', {}).get('max', 0)
         
         parts.append("FINANCIAL OVERVIEW:")
         parts.append("-" * 70)
-        parts.append(f"Hospital Bill Total:        Rs. {total_bill:>12,.0f}")
-        
-        # Only show insurance lines if insurance was actually involved
-        if scenario in ["C_insurance_dispute", "D_hospital_overcharge_only"] or approved > 0 or rejected > 0:
-            parts.append(f"Insurance Approved:         Rs. {approved:>12,.0f}")
-            parts.append(f"Insurance Rejected:         Rs. {rejected:>12,.0f}")
-        
-        parts.append(f"Your Out-of-Pocket:         Rs. {liability:>12,.0f}")
-        parts.append("")
-        parts.append("REVIEW STATUS:")
-        parts.append("-" * 70)
-        parts.append(f"Verified Overcharges:       Rs. {verified:>12,.0f}")
-        
-        if verified > 0:
-            parts.append(f"Estimated Recoverable:      Rs. {min_rec:>12,.0f} - Rs. {max_rec:,.0f}")
-        else:
-            parts.append("Estimated Recoverable:      None confirmed yet")
-            parts.append("                            (clarification in progress)")
-        
-        parts.append("")
-        parts.append("=" * 70)
+        parts.append(f"   Total Bill:              Rs. {total_bill:,.0f}")
+        parts.append(f"   Verified Excess:         Rs. {verified:,.0f}")
         parts.append("")
         
-        # Issues by confidence
         issues = self.analysis.get('issues', [])
         high_conf = [i for i in issues if i.get('confidence') == 'high']
         medium_conf = [i for i in issues if i.get('confidence') == 'medium']
         low_conf = [i for i in issues if i.get('confidence') == 'low']
         
-        # Scenario-specific framing
-        if scenario == "A_cash_clarification":
-            parts.append("WHAT WE FOUND:")
-            parts.append("")
-            parts.append(
-                f"We did NOT find confirmed overcharges in your bill. However, "
-                f"{len(low_conf) + len(medium_conf)} item(s) need clarification from "
-                f"the hospital before we can fully verify them against benchmarks."
-            )
-            parts.append("")
-            parts.append("This is normal for bills where:")
-            parts.append("- Procedure codes are not listed (only descriptions)")
-            parts.append("- Charges are bundled into packages without itemization")
-            parts.append("- Room tariffs don't specify what's included")
-            parts.append("")
-        elif scenario == "B_cash_objection":
-            parts.append(f"WHAT WE FOUND: {len(high_conf)} confirmed overcharge(s) totaling Rs. {verified:,.0f}")
-            parts.append("")
-        elif scenario == "C_insurance_dispute":
-            parts.append("WHAT WE FOUND:")
-            parts.append("Your insurance claim has issues that may be invalidly rejected or short-paid.")
-            parts.append("")
-        else:
-            parts.append(f"WHAT WE FOUND: {len(issues)} issue(s) requiring review")
-            parts.append("")
-        
-        # Show issues
         if high_conf:
-            parts.append(f"HIGH CONFIDENCE ISSUES ({len(high_conf)}) — verifiable overcharges:")
-            parts.append("")
-            for issue in high_conf[:5]:
-                desc = issue.get('description', '')
+            parts.append(f"VERIFIED EXCESS CHARGES ({len(high_conf)}):")
+            parts.append("-" * 70)
+            for issue in high_conf[:10]:
+                desc = issue.get('description', '').replace(' (illegal)', '')
                 amount = issue.get('overcharge_amount', 0)
-                parts.append(f"  - {desc}")
-                parts.append(f"    Amount: Rs. {amount:,.0f}")
-                parts.append("")
+                parts.append(f"   - {desc}")
+                parts.append(f"     Excess: Rs. {amount:,.0f}")
+            parts.append("")
         
         if medium_conf:
-            parts.append(f"MEDIUM CONFIDENCE ISSUES ({len(medium_conf)}) — likely issues, need confirmation:")
+            parts.append(f"ITEMS NEEDING VERIFICATION ({len(medium_conf)}):")
+            parts.append("-" * 70)
+            for issue in medium_conf[:10]:
+                parts.append(f"   - {issue.get('description', '')}")
             parts.append("")
-            for issue in medium_conf[:3]:
-                desc = issue.get('description', '')
-                parts.append(f"  - {desc}")
-                parts.append("")
         
         if low_conf:
             parts.append(f"ITEMS NEEDING CLARIFICATION ({len(low_conf)}):")
+            parts.append("-" * 70)
+            for issue in low_conf[:10]:
+                parts.append(f"   - {issue.get('description', '')}")
             parts.append("")
-            for issue in low_conf[:3]:
-                desc = issue.get('description', '')
-                parts.append(f"  - {desc}")
-                parts.append("    Action: Ask hospital for procedure code and tariff details")
-                parts.append("")
         
         parts.append("=" * 70)
         parts.append("")
-        
-        # Scenario-specific action plan
         parts.append("RECOMMENDED ACTIONS:")
         parts.append("")
-        
-        if scenario == "A_cash_clarification":
-            parts.append("STEP 1 (Within 7 Days):")
-            parts.append("  Send the clarification request letter to the hospital billing department.")
-            parts.append("  Use registered post OR email with delivery confirmation.")
-            parts.append("")
-            parts.append("STEP 2 (After Hospital Responds):")
-            parts.append("  Re-upload your bill to BillShield along with the hospital's reply.")
-            parts.append("  We will then compare the disclosed tariffs against CGHS benchmarks.")
-            parts.append("")
-            parts.append("STEP 3 (If Hospital Refuses to Respond After 14 Days):")
-            parts.append("  - File a complaint with the State Health Department")
-            parts.append("  - Lodge a grievance under Clinical Establishments Act (if applicable)")
-            parts.append("  - Contact local consumer rights organizations")
-            parts.append("")
-        elif scenario == "B_cash_objection":
-            parts.append("STEP 1 (Within 7 Days):")
-            parts.append("  Send the hospital objection letter via registered post.")
-            parts.append("  Include the BillShield report as supporting evidence.")
-            parts.append("")
-            parts.append("STEP 2 (If No Response After 14 Days):")
-            parts.append("  - File consumer complaint at District Consumer Forum")
-            parts.append("  - Approach State Medical Council if procedural concerns exist")
-            parts.append("")
-        elif scenario == "C_insurance_dispute":
-            parts.append("STEP 1 (Within 7 Days):")
-            parts.append("  Send the insurance escalation letter to your insurer's grievance officer.")
-            parts.append("  Send the hospital letter if there are also hospital-side issues.")
-            parts.append("")
-            parts.append("STEP 2 (After 14 Days, If Unresolved):")
-            parts.append("  - File grievance at IRDAI Bima Bharosa portal: bimabharosa.irdai.gov.in")
-            parts.append("  - Approach Insurance Ombudsman for your region")
-            parts.append("  - File consumer complaint if applicable")
-            parts.append("")
-        else:
-            parts.append("STEP 1: Send the hospital objection letter via registered post.")
-            parts.append("STEP 2: Wait 14 days for response.")
-            parts.append("STEP 3: Escalate if needed.")
-            parts.append("")
-        
+        parts.append("STEP 1 (Within 7 days):")
+        parts.append("   Send the enclosed letter to the hospital billing department.")
+        parts.append("   Use registered post or email with delivery confirmation.")
+        parts.append("   Attach a copy of this BillShield report.")
+        parts.append("")
+        parts.append("STEP 2 (After 15 days, if no response):")
+        parts.append("   - Approach the hospital's grievance redressal officer")
+        parts.append("   - If insurance is involved: file grievance with insurer's grievance cell")
+        parts.append("   - Submit a complaint at bimabharosa.irdai.gov.in (for claim issues)")
+        parts.append("")
+        parts.append("STEP 3 (If still unresolved):")
+        parts.append("   - File at District Consumer Disputes Redressal Commission")
+        parts.append("   - Approach the Insurance Ombudsman (for claim-related disputes)")
+        parts.append("   - Report to State Health Authority under Clinical Establishments Act")
+        parts.append("")
         parts.append("DOCUMENTS TO KEEP READY:")
-        parts.append("- Original hospital bills and payment receipts")
-        parts.append("- Discharge summary (if applicable)")
-        parts.append("- This BillShield analysis report")
-        parts.append("- Proof of letter delivery (postal receipt or email confirmation)")
-        if scenario in ["C_insurance_dispute", "D_hospital_overcharge_only"]:
-            parts.append("- Insurance policy document")
-            parts.append("- Claim rejection/settlement letter from insurer")
-        
+        parts.append("   - Original hospital bills and payment receipts")
+        parts.append("   - Discharge summary")
+        parts.append("   - This BillShield analysis report")
+        parts.append("   - Proof of letter delivery (postal receipt or email confirmation)")
+        parts.append("   - Insurance policy document and claim correspondence (if applicable)")
         parts.append("")
         parts.append("=" * 70)
-        parts.append("")
-        parts.append("Generated by BillShield Medical Bill Auditor")
+        parts.append("Generated by BillShield — Medical Bill Auditor")
         
         return "\n".join(parts)
     
     def _build_confidence_based_language(self) -> str:
-        """Build letter language based on issue confidence."""
-        content = []
-        
-        for issue in self.analysis.get('issues', []):
-            confidence = issue.get('confidence', '')
-            desc = issue.get('description', '')
-            benchmark = issue.get('benchmark_amount')
-            
-            content.append(f"• {desc}")
-            
-            if confidence == 'high':
-                benchmark_text = (
-                    f"₹{benchmark:,.0f}"
-                    if isinstance(benchmark, (int, float)) and benchmark
-                    else "the available benchmark"
-                )
-                content.append(
-                    f"  This line item appears significantly above the CGHS benchmark of {benchmark_text}. "
-                    "Please justify this charge with reference to your tariff card and procedure code, "
-                    "or revise the amount before final settlement."
-                )
-            elif confidence == 'medium':
-                content.append(
-                    "  The closest CGHS benchmark we could locate suggests this charge may exceed the "
-                    "reference rate. Please confirm the exact procedure performed and provide the "
-                    "procedure code so we can verify."
-                )
-            elif confidence == 'low':
-                content.append(
-                    "  We were unable to locate this exact item in published CGHS rates. Please provide:\n"
-                    "  1. The exact name and procedure code of the item billed\n"
-                    "  2. Your tariff card entry for this code\n"
-                    "  3. Whether this charge is part of a package or standalone\n"
-                    "  Please clarify before final payment."
-                )
-            
-            content.append("")
-        
-        return "\n".join(content).strip()
+        """Legacy helper, kept for backward compatibility."""
+        return ""
     
     def _get_applicable_sections(self) -> List:
-        """Get only sections that apply to this analysis."""
         return [
             section for section in self.available_sections
             if section.applies_when(self.analysis) and section.user_enabled
         ]
     
     def _build_regulatory_references(self) -> str:
-        """Build list of only cited regulations."""
         cited_regs = set()
-        
         for issue in self.analysis.get('issues', []):
             for evidence in issue.get('evidence', []):
                 if 'CGHS' in evidence:
-                    cited_regs.add("- CGHS Rate Schedule 2025 (Central Government Health Scheme)")
-                if 'NPPA' in evidence and 'device' in evidence.lower():
-                    cited_regs.add("- NPPA Medical Device Price Ceilings (April 2026 revision)")
-                if 'NPPA' in evidence and 'drug' in evidence.lower():
-                    cited_regs.add("- NPPA Drug Price Control Orders")
+                    cited_regs.add("- CGHS Rate Schedule (Central Government Health Scheme)")
+                if 'NPPA' in evidence:
+                    cited_regs.add("- NPPA Price Control Orders")
                 if 'IRDAI' in evidence:
-                    cited_regs.add("- IRDAI Master Circular 2024 / Multi-Procedure Billing Guidelines")
-        
+                    cited_regs.add("- IRDAI Master Circular 2024")
         return "\n".join(sorted(cited_regs))
 
 
 def generate_all_letters(analysis_result_path: Path, output_dir: Path, tone: ToneType = 'professional'):
-    """Generate all letter types from an analysis result JSON."""
-    
+    """Generate letters from an analysis result JSON."""
     with open(analysis_result_path, 'r') as f:
         analysis = json.load(f)
-    
     generator = AdaptiveLetterGenerator(analysis)
-    
     output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Hospital letter
     hospital_letter = generator.generate_hospital_letter(tone=tone)
     (output_dir / 'hospital_objection_letter.txt').write_text(hospital_letter)
-    
-    print(f"✅ Generated hospital letter ({tone} tone)")
-    print(f"   Saved to: {output_dir / 'hospital_objection_letter.txt'}")
+    print(f"Generated hospital letter ({tone} tone)")
+PYEOF
