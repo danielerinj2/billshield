@@ -2431,7 +2431,7 @@ async function loadDashboard() {
     
     const { data: analyses, error } = await supabaseClient
         .from('analyses')
-        .select('id, status, patient_name, hospital_name, bill_number, bill_total, verified_overcharge, created_at, expires_at, issues(count)')
+        .select('id, status, patient_name, hospital_name, bill_number, bill_total, verified_overcharge, created_at, expires_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
     
@@ -2450,7 +2450,7 @@ async function loadDashboard() {
     listEl.innerHTML = analyses.map(a => {
         const daysLeft = Math.max(0, Math.ceil((new Date(a.expires_at) - Date.now()) / (1000 * 60 * 60 * 24)));
         const expiresClass = daysLeft < 7 ? 'expires-warning' : '';
-        const issueCount = a.issues?.[0]?.count || 0;
+        const issueCount = '—';  // We'll fetch this separately if needed
         const title = a.hospital_name || a.patient_name || `Analysis ${a.id.substring(0, 8)}`;
         
         return `
