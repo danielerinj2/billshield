@@ -2310,12 +2310,23 @@ async function handleAuthSubmit(event) {
                     full_name: fullName,
                 }).eq('id', data.user.id);
                 
-                await claimAnonymousAnalyses();
+                const claimedCount = await claimAnonymousAnalyses();
+                console.log('✅ Claimed analyses:', claimedCount);
+                
                 await checkAuthState();
                 closeAuthModal();
                 
-                if (authModalContext === 'gate') {
-                    location.reload();
+                if (authModalContext === 'gate' && window.currentAnalysisId) {
+                    // User just signed up from gate - show the results they just analyzed
+                    const results = await getResults(window.currentAnalysisId);
+                    if (results) {
+                        displayResults(results);
+                        document.getElementById('analyzing').classList.remove('active');
+                        document.getElementById('results').classList.add('active');
+                    } else {
+                        showPage('dashboard');
+                        loadDashboard();
+                    }
                 } else {
                     showPage('dashboard');
                     loadDashboard();
@@ -2329,12 +2340,23 @@ async function handleAuthSubmit(event) {
                 return;
             }
             
-            await claimAnonymousAnalyses();
+            const claimedCount = await claimAnonymousAnalyses();
+            console.log('✅ Claimed analyses:', claimedCount);
+            
             await checkAuthState();
             closeAuthModal();
             
-            if (authModalContext === 'gate') {
-                location.reload();
+            if (authModalContext === 'gate' && window.currentAnalysisId) {
+                // User just logged in from gate - show the results they just analyzed
+                const results = await getResults(window.currentAnalysisId);
+                if (results) {
+                    displayResults(results);
+                    document.getElementById('analyzing').classList.remove('active');
+                    document.getElementById('results').classList.add('active');
+                } else {
+                    showPage('dashboard');
+                    loadDashboard();
+                }
             } else {
                 showPage('dashboard');
                 loadDashboard();
