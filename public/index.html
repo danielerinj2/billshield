@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Geist+Sans:wght@400;500;600;700;900&family=Geist+Mono:wght@400;600&display=swap" rel="stylesheet">
-    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -208,17 +208,27 @@
             letter-spacing: -0.02em;
         }
 
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+            flex: 1;
+            justify-content: center;
+        }
         .nav-links a {
-            margin-left: 2rem;
             color: var(--text-muted);
             text-decoration: none;
             font-weight: 500;
             font-size: 0.95rem;
             transition: color 0.2s;
         }
-
+        
         .nav-links a:hover {
             color: var(--primary);
+        }
+        
+        .nav-auth {
+            margin-left: auto;
         }
 
         /* Hero Section */
@@ -1191,6 +1201,278 @@
             color: #92400E;
         }
 
+        /* ========================================
+   AUTH MODAL (post-analysis gate)
+   ======================================== */
+.auth-modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.auth-modal-backdrop.active {
+    display: flex;
+}
+.auth-modal {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    max-width: 480px;
+    width: 100%;
+    padding: 2.5rem;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+.auth-modal h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+}
+.auth-modal .auth-subtitle {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+}
+.auth-tabs {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    background: #f1f5f9;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+.auth-tab {
+    flex: 1;
+    padding: 0.625rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    background: transparent;
+    border: none;
+    font-family: inherit;
+}
+.auth-tab.active {
+    background: white;
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.auth-form input[type="email"],
+.auth-form input[type="password"],
+.auth-form input[type="text"] {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    margin-bottom: 0.75rem;
+    transition: border-color 0.15s;
+}
+.auth-form input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+.auth-consent {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0.75rem 0 1rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+.auth-consent input[type="checkbox"] {
+    margin-top: 0.2rem;
+    flex-shrink: 0;
+}
+.auth-consent a { color: var(--primary); }
+.auth-submit {
+    width: 100%;
+    padding: 0.875rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+}
+.auth-submit:hover:not(:disabled) {
+    background: var(--primary-dark);
+}
+.auth-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.auth-divider {
+    display: flex;
+    align-items: center;
+    margin: 1.25rem 0;
+    color: #cbd5e1;
+    font-size: 0.8rem;
+}
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+.auth-divider span {
+    padding: 0 0.75rem;
+}
+.auth-google-btn {
+    width: 100%;
+    padding: 0.75rem;
+    background: white;
+    color: var(--text);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    transition: background 0.15s;
+}
+.auth-google-btn:hover {
+    background: #f8fafc;
+}
+.auth-error {
+    padding: 0.75rem;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+.auth-footer-text {
+    text-align: center;
+    margin-top: 1rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+.auth-footer-text a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+    cursor: pointer;
+}
+.auth-preview {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    padding: 1.25rem;
+    border-radius: 10px;
+    margin-bottom: 1.5rem;
+}
+.auth-preview-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(37, 99, 235, 0.1);
+}
+.auth-preview-row:last-child { border-bottom: none; }
+.auth-preview-label {
+    font-size: 0.85rem;
+    color: #1e40af;
+}
+.auth-preview-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e3a8a;
+}
+.nav-auth {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.nav-auth-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    font-family: inherit;
+    border: none;
+    transition: all 0.15s;
+}
+.nav-auth-btn-secondary {
+    color: var(--text-muted);
+    background: transparent;
+}
+.nav-auth-btn-secondary:hover {
+    color: var(--text);
+}
+.nav-auth-btn-primary {
+    background: #0F172A;
+    color: white;
+}
+.nav-auth-btn-primary:hover {
+    background: #1E293B;
+}
+.nav-user-menu {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+.dashboard-grid {
+    display: grid;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+.dashboard-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    transition: box-shadow 0.15s;
+}
+.dashboard-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+.dashboard-card-info h4 {
+    margin-bottom: 0.5rem;
+}
+.dashboard-card-stats {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+.dashboard-card-stats strong {
+    color: var(--text);
+    font-size: 1rem;
+}
+.dashboard-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+.expires-warning { color: #d97706; }
     </style>
 </head>
 <body>
@@ -1199,12 +1481,12 @@
         <div class="nav-container">
             <div class="logo">BillShield</div>
             <div class="nav-links">
-                <a href="#" onclick="showPage('landing'); return false;">Home</a>
                 <a href="#how-it-works">How It Works</a>
                 <a href="#what-we-flag">What We Flag</a>
                 <a href="#faq">FAQ</a>
             </div>
-        </div>
+            <div id="navAuthButtons" class="nav-auth"></div>
+        </div>      
     </nav>
 
     <!-- PAGE 1: LANDING -->
@@ -1472,14 +1754,27 @@
     <div id="analyzing" class="page">
         <div class="analyzing-container">
             <div class="analyzing-icon"></div>
-            <h1 style="font-size: 7rem; font-weight: 700; margin-bottom: 1.5rem; letter-spacing: -0.02em; line-height: 1.1;">Analyzing Your Bill</h1>
-            <p style="color: #6b7280; margin-bottom: 4rem; font-size: 2.45rem; font-weight: 400; line-height: 1.5;">Take a breather. This part takes a few minutes.</p>
+            
+            <h1 style="font-size: 3rem; font-weight: 700; margin-bottom: 1rem; letter-spacing: -0.02em; line-height: 1.1; color: var(--text);">
+                Analyzing Your Bill
+            </h1>
+            
+            <p style="font-size: 1.25rem; font-weight: 400; line-height: 1.5; color: #64748B; margin-bottom: 3rem;">
+                Take a breather. This part takes a few minutes.
+            </p>
+            
             <div class="progress-container">
-                <div class="status-message" id="statusMessage" style="margin-bottom: 1.5rem; font-weight: 600; color: var(--text); font-size: 2.1rem;">Starting AI analysis...</div>
+                <div class="status-message" id="statusMessage" style="font-size: 1.125rem; font-weight: 600; color: var(--text); margin-bottom: 1rem;">
+                    Starting AI analysis...
+                </div>
+                
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressBar"></div>
                 </div>
-                <div class="quirky-message" id="quirkyMessage" style="margin-top: 2rem; font-style: italic; color: #6b7280; font-family: 'Geist Sans', sans-serif; font-size: 1.9rem; line-height: 1.6; max-width: 700px; margin-left: auto; margin-right: auto; min-height: 2rem; transition: opacity 0.5s ease;">Reading between the lines (literally—hospitals love vague bundling)...</div>
+                
+                <div class="quirky-message" id="quirkyMessage" style="margin-top: 1.5rem; font-style: italic; color: #64748B; font-size: 1rem; line-height: 1.6; max-width: 600px; margin-left: auto; margin-right: auto; min-height: 1.5rem; transition: opacity 0.5s ease;">
+                    Reading between the lines (literally—hospitals love vague bundling)...
+                </div>
             </div>
         </div>
     </div>
@@ -1631,6 +1926,32 @@
         </div>
     </div>
 
+    <!-- PAGE 6: DASHBOARD -->
+<div id="dashboard" class="page">
+    <section class="section">
+        <div class="container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div>
+                    <h1 style="font-size: 2rem;">Your analyses</h1>
+                    <p style="color: var(--text-muted); margin-top: 0.5rem;">Analyses auto-delete after 30 days. PDFs are deleted after analysis.</p>
+                </div>
+                <button class="btn btn-primary" onclick="showPage('upload')">+ New analysis</button>
+            </div>
+            
+            <div id="dashboardLoading" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+                Loading your analyses...
+            </div>
+            
+            <div id="dashboardEmpty" class="dashboard-empty" style="display: none;">
+                <h3 style="margin-bottom: 0.5rem;">No analyses yet</h3>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Upload your first medical bill to see if you've been overcharged.</p>
+                <button class="btn btn-primary" onclick="showPage('upload')">Upload a bill</button>
+            </div>
+            
+            <div id="dashboardList" class="dashboard-grid"></div>
+        </div>
+    </section>
+</div>
 <!-- PAGE 6: DOWNLOAD -->
     <div id="download" class="page">
         <div class="download-container">
@@ -1822,6 +2143,385 @@
 // BillShield API Integration
 // ==============================================
 
+
+// ======================================================================
+// SUPABASE CLIENT SETUP
+// ======================================================================
+const SUPABASE_URL = 'https://uceblkygodgyoeiwwjqn.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjZWJsa3lnb2RneW9laXd3anFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MDc2NjAsImV4cCI6MjA5NDE4MzY2MH0.DC8giGhHb4blDJoeKD8UESNih0Ul4SMsrgqOSx81XEU';
+
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ======================================================================
+// SESSION TOKEN (for anonymous analyses)
+// ======================================================================
+function getOrCreateSessionToken() {
+    let token = localStorage.getItem('billshield_session_token');
+    if (!token) {
+        token = crypto.randomUUID();
+        localStorage.setItem('billshield_session_token', token);
+    }
+    return token;
+}
+
+function clearSessionToken() {
+    localStorage.removeItem('billshield_session_token');
+}
+
+// ======================================================================
+// AUTH STATE (updated on signup/login/logout)
+// ======================================================================
+let currentUser = null;
+let currentAnalysisId = null;
+
+async function checkAuthState() {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    currentUser = user;
+    updateNavForAuthState();
+    return user;
+}
+
+function updateNavForAuthState() {
+    const authButtonsContainer = document.getElementById('navAuthButtons');
+    if (!authButtonsContainer) return;
+    
+    if (currentUser) {
+        authButtonsContainer.innerHTML = `
+            <div class="nav-user-menu">
+                <span>${currentUser.email}</span>
+                <button class="nav-auth-btn nav-auth-btn-secondary" onclick="showPage('dashboard'); loadDashboard()">My analyses</button>
+                <button class="nav-auth-btn nav-auth-btn-secondary" onclick="handleLogout()">Log out</button>
+            </div>
+        `;
+    } else {
+        authButtonsContainer.innerHTML = `
+            <button class="nav-auth-btn nav-auth-btn-secondary" onclick="openAuthModal('login')">Log in</button>
+            <button class="nav-auth-btn nav-auth-btn-primary" onclick="openAuthModal('signup')">Sign up</button>
+        `;
+    }
+}
+
+// ======================================================================
+// AUTH MODAL
+// ======================================================================
+let authMode = 'signup';
+let authModalContext = 'nav';
+
+function openAuthModal(mode = 'signup', context = 'nav', preview = null) {
+    authMode = mode;
+    authModalContext = context;
+    
+    document.getElementById('authError').style.display = 'none';
+    document.getElementById('authEmail').value = '';
+    document.getElementById('authPassword').value = '';
+    document.getElementById('authFullName').value = '';
+    document.getElementById('authConsent').checked = false;
+    
+    if (context === 'gate' && preview) {
+        document.getElementById('authPreview').style.display = 'block';
+        document.getElementById('authPreviewTotal').textContent = (preview.bill_total || 0).toLocaleString('en-IN');
+        document.getElementById('authPreviewIssues').textContent = preview.issues_count || 0;
+        if (preview.hospital_name) {
+            document.getElementById('authPreviewHospitalRow').style.display = 'flex';
+            document.getElementById('authPreviewHospital').textContent = preview.hospital_name;
+        } else {
+            document.getElementById('authPreviewHospitalRow').style.display = 'none';
+        }
+        document.getElementById('authModalTitle').textContent = 'Your analysis is ready';
+        document.getElementById('authModalSubtitle').textContent = 'Sign up free to view the full report and generate dispute letters.';
+    } else {
+        document.getElementById('authPreview').style.display = 'none';
+        document.getElementById('authModalTitle').textContent = mode === 'signup' ? 'Create your account' : 'Log in';
+        document.getElementById('authModalSubtitle').textContent = mode === 'signup' 
+            ? 'Save analyses, generate letters, track disputes.' 
+            : 'Welcome back.';
+    }
+    
+    setAuthMode(mode);
+    document.getElementById('authModal').classList.add('active');
+}
+
+function closeAuthModal() {
+    document.getElementById('authModal').classList.remove('active');
+}
+
+function setAuthMode(mode) {
+    authMode = mode;
+    
+    document.querySelectorAll('.auth-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.mode === mode);
+    });
+    
+    const isSignup = mode === 'signup';
+    document.getElementById('signupNameField').style.display = isSignup ? 'block' : 'none';
+    document.getElementById('signupConsentField').style.display = isSignup ? 'flex' : 'none';
+    document.getElementById('authFullName').required = isSignup;
+    
+    const submitBtn = document.getElementById('authSubmitBtn');
+    if (authModalContext === 'gate') {
+        submitBtn.textContent = isSignup ? 'Sign up & view report' : 'Log in & view report';
+    } else {
+        submitBtn.textContent = isSignup ? 'Create account' : 'Log in';
+    }
+}
+
+function showAuthError(msg) {
+    const errEl = document.getElementById('authError');
+    errEl.textContent = msg;
+    errEl.style.display = 'block';
+}
+
+async function handleAuthSubmit(event) {
+    event.preventDefault();
+    document.getElementById('authError').style.display = 'none';
+    
+    const email = document.getElementById('authEmail').value;
+    const password = document.getElementById('authPassword').value;
+    const fullName = document.getElementById('authFullName').value;
+    const consent = document.getElementById('authConsent').checked;
+    
+    const submitBtn = document.getElementById('authSubmitBtn');
+    submitBtn.disabled = true;
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Please wait...';
+    
+    try {
+        if (authMode === 'signup') {
+            if (!consent) {
+                showAuthError('Please agree to the data policy to continue.');
+                return;
+            }
+            
+            const { data, error } = await supabaseClient.auth.signUp({
+                email,
+                password,
+                options: { data: { full_name: fullName } }
+            });
+            
+            if (error) {
+                showAuthError(error.message);
+                return;
+            }
+            
+            if (data.user) {
+                await supabaseClient.from('user_profiles').update({
+                    consent_given: true,
+                    consent_at: new Date().toISOString(),
+                    full_name: fullName,
+                }).eq('id', data.user.id);
+                
+                await claimAnonymousAnalyses();
+                await checkAuthState();
+                closeAuthModal();
+                
+                if (authModalContext === 'gate') {
+                    location.reload();
+                } else {
+                    showPage('dashboard');
+                    loadDashboard();
+                }
+            }
+        } else {
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            
+            if (error) {
+                showAuthError(error.message);
+                return;
+            }
+            
+            await claimAnonymousAnalyses();
+            await checkAuthState();
+            closeAuthModal();
+            
+            if (authModalContext === 'gate') {
+                location.reload();
+            } else {
+                showPage('dashboard');
+                loadDashboard();
+            }
+        }
+    } catch (err) {
+        showAuthError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    }
+}
+
+async function handleGoogleAuth() {
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+            redirectTo: window.location.origin + window.location.pathname,
+        }
+    });
+    if (error) showAuthError(error.message);
+}
+
+async function handleLogout() {
+    await supabaseClient.auth.signOut();
+    currentUser = null;
+    updateNavForAuthState();
+    showPage('landing');
+}
+
+// ======================================================================
+// CLAIM ANONYMOUS ANALYSES (after signup/login)
+// ======================================================================
+async function claimAnonymousAnalyses() {
+    const sessionToken = localStorage.getItem('billshield_session_token');
+    if (!sessionToken) return 0;
+    
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) return 0;
+    
+    const { data, error } = await supabaseClient.rpc('claim_anonymous_analyses', {
+        p_session_token: sessionToken,
+        p_user_id: user.id,
+    });
+    
+    if (error) {
+        console.error('Claim failed:', error);
+        return 0;
+    }
+    
+    clearSessionToken();
+    return data || 0;
+}
+
+// ======================================================================
+// DASHBOARD - load user's analyses
+// ======================================================================
+async function loadDashboard() {
+    const loadingEl = document.getElementById('dashboardLoading');
+    const emptyEl = document.getElementById('dashboardEmpty');
+    const listEl = document.getElementById('dashboardList');
+    
+    loadingEl.style.display = 'block';
+    emptyEl.style.display = 'none';
+    listEl.innerHTML = '';
+    
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) {
+        openAuthModal('login');
+        return;
+    }
+    
+    const { data: analyses, error } = await supabaseClient
+        .from('analyses')
+        .select('id, status, patient_name, hospital_name, bill_number, bill_total, verified_overcharge, created_at, expires_at, issues(count)')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+    
+    loadingEl.style.display = 'none';
+    
+    if (error) {
+        listEl.innerHTML = `<p style="color: var(--danger);">Error: ${error.message}</p>`;
+        return;
+    }
+    
+    if (!analyses || analyses.length === 0) {
+        emptyEl.style.display = 'block';
+        return;
+    }
+    
+    listEl.innerHTML = analyses.map(a => {
+        const daysLeft = Math.max(0, Math.ceil((new Date(a.expires_at) - Date.now()) / (1000 * 60 * 60 * 24)));
+        const expiresClass = daysLeft < 7 ? 'expires-warning' : '';
+        const issueCount = a.issues?.[0]?.count || 0;
+        const title = a.hospital_name || a.patient_name || `Analysis ${a.id.substring(0, 8)}`;
+        
+        return `
+            <div class="dashboard-card">
+                <div class="dashboard-card-info">
+                    <h4>${escapeHtml(title)}</h4>
+                    ${a.bill_number ? `<p style="font-size: 0.85rem; color: var(--text-muted);">Bill #${escapeHtml(a.bill_number)}</p>` : ''}
+                    <div class="dashboard-card-stats">
+                        <div>Total: <strong>₹${(a.bill_total || 0).toLocaleString('en-IN')}</strong></div>
+                        <div>Overcharges: <strong style="${(a.verified_overcharge || 0) > 0 ? 'color: var(--danger);' : ''}">₹${(a.verified_overcharge || 0).toLocaleString('en-IN')}</strong></div>
+                        <div>Issues: <strong>${issueCount}</strong></div>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <button class="btn btn-primary" onclick="viewAnalysis('${a.id}')">View</button>
+                    <div style="font-size: 0.75rem; margin-top: 0.5rem; color: var(--text-muted);" class="${expiresClass}">
+                        Expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}
+                    </div>
+                    <button onclick="deleteAnalysis('${a.id}')" style="font-size: 0.75rem; background: none; border: none; color: var(--text-muted); cursor: pointer; margin-top: 0.25rem;">Delete</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function viewAnalysis(analysisId) {
+    currentAnalysisId = analysisId;
+    showPage('results');
+    // Your existing code will need to load this analysis
+    // We'll wire this up in the next chunk
+}
+
+async function deleteAnalysis(analysisId) {
+    if (!confirm('Delete this analysis? This cannot be undone.')) return;
+    const { error } = await supabaseClient.from('analyses').delete().eq('id', analysisId);
+    if (!error) loadDashboard();
+}
+
+function escapeHtml(s) {
+    if (!s) return '';
+    return s.replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+}
+
+// ======================================================================
+// Helper: get Authorization header if user is logged in
+// ======================================================================
+async function getAuthHeader() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session?.access_token) {
+        return { 'Authorization': `Bearer ${session.access_token}` };
+    }
+    return {};
+}
+
+// ======================================================================
+// INITIALIZE on page load
+// ======================================================================
+window.addEventListener('DOMContentLoaded', async () => {
+    await checkAuthState();
+    
+    supabaseClient.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN') {
+            currentUser = session?.user || null;
+            await claimAnonymousAnalyses();
+            updateNavForAuthState();
+        } else if (event === 'SIGNED_OUT') {
+            currentUser = null;
+            updateNavForAuthState();
+        }
+    });
+});
+
+// ======================================================================
+// GATE MODAL — call this when analysis completes
+// ======================================================================
+async function maybeShowAuthGate(analysisId, analysisData) {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (user) return false;
+    
+    const issuesCount = (analysisData?.issues || []).length;
+    const billTotal = analysisData?.bill_total || analysisData?.total_bill || 0;
+    const hospitalName = analysisData?.hospital_name;
+    
+    openAuthModal('signup', 'gate', {
+        bill_total: billTotal,
+        issues_count: issuesCount,
+        hospital_name: hospitalName,
+    });
+    
+    return true;
+}
 const API_URL = 'https://billshield.up.railway.app';
 // Quirky rotating messages while analyzing
 const QUIRKY_MESSAGES = [
@@ -2000,9 +2700,18 @@ window.handleUpload = async function(event) {
         updateStatus('Analyzing against 8,047 benchmarks...');
         const results = await waitForResults(analysisId, (progress) => { updateProgress(progress); });
 
+        // Check if user needs to sign up before viewing results
+        const gateShown = await maybeShowAuthGate(analysisId, results);
+        if (gateShown) {
+            // User needs to sign up - stop here, modal will reload page on success
+            stopQuirkyMessages();
+            return;
+        }
+        
+        // User is logged in - show results
         displayResults(results);
         window.currentAnalysisId = analysisId;
-        stopQuirkyMessages();  // Stop the quirky message loop
+        stopQuirkyMessages();
         document.getElementById('analyzing').classList.remove('active');
         document.getElementById('results').classList.add('active');
 
@@ -2622,5 +3331,67 @@ function previewLetter(letterId) {
 console.log('✅ BillShield API Integration Loaded');
 console.log('🔗 Backend URL:', API_URL);
 </script>
+<div id="authModal" class="auth-modal-backdrop">
+    <div class="auth-modal">
+        <div id="authPreview" class="auth-preview" style="display: none;">
+            <div class="auth-preview-row">
+                <span class="auth-preview-label">Total bill</span>
+                <span class="auth-preview-value">₹<span id="authPreviewTotal">0</span></span>
+            </div>
+            <div class="auth-preview-row">
+                <span class="auth-preview-label">Issues flagged</span>
+                <span class="auth-preview-value"><span id="authPreviewIssues">0</span></span>
+            </div>
+            <div class="auth-preview-row" id="authPreviewHospitalRow" style="display: none;">
+                <span class="auth-preview-label">Hospital</span>
+                <span class="auth-preview-value" id="authPreviewHospital" style="font-size: 0.9rem;"></span>
+            </div>
+        </div>
+        
+        <h2 id="authModalTitle">Sign up to view your full report</h2>
+        <p class="auth-subtitle" id="authModalSubtitle">Free. Takes 10 seconds. Your bill stays private.</p>
+        
+        <div id="authError" class="auth-error" style="display: none;"></div>
+        
+        <div class="auth-tabs">
+            <button class="auth-tab active" data-mode="signup" onclick="setAuthMode('signup')">Sign up</button>
+            <button class="auth-tab" data-mode="login" onclick="setAuthMode('login')">Log in</button>
+        </div>
+        
+        <form class="auth-form" onsubmit="handleAuthSubmit(event)">
+            <div id="signupNameField">
+                <input type="text" id="authFullName" placeholder="Full name" required>
+            </div>
+            <input type="email" id="authEmail" placeholder="Email" required>
+            <input type="password" id="authPassword" placeholder="Password (8+ characters)" required minlength="8">
+            
+            <div id="signupConsentField" class="auth-consent">
+                <input type="checkbox" id="authConsent">
+                <label for="authConsent">
+                    I consent to BillShield storing my bill analysis for 30 days. 
+                    PDFs are deleted after analysis. I can delete my data anytime.
+                </label>
+            </div>
+            
+            <button type="submit" class="auth-submit" id="authSubmitBtn">Sign up & view report</button>
+        </form>
+        
+        <div class="auth-divider"><span>or</span></div>
+        
+        <button class="auth-google-btn" onclick="handleGoogleAuth()">
+            <svg width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Continue with Google
+        </button>
+        
+        <p class="auth-footer-text">
+            <a onclick="closeAuthModal()">Maybe later</a>
+        </p>
+    </div>
+</div>
 </body>
 </html>
