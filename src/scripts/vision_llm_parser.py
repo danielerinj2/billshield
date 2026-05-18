@@ -113,16 +113,23 @@ EXTRACTION HIERARCHY (in priority order):
    - Example: "IP Consultation - Dr. Jaisankar P - ₹1,000"
 
 3. WHAT NOT TO EXTRACT AS LINE ITEMS:
-   - Category summaries like "MEDICINE CHARGES: ₹18,826" - SKIP THESE
-   - Category summaries like "LABORATORY: ₹4,460" - SKIP THESE
-   - Only extract if it's an INDIVIDUAL item with specific details
+   - Page 1 category summaries like "MEDICINE CHARGES: ₹18,826" - SKIP
+   - Page 1 category summaries like "LABORATORY: ₹4,460" - SKIP
+   - Any line that's just a category name + total amount - SKIP
+   - Only extract INDIVIDUAL items from pages 3-8 with their INDIVIDUAL amounts
+   
+4. CRITICAL AMOUNT EXTRACTION RULE:
+   - Each line item must have its OWN specific amount
+   - "Complete Blood Count (CBC) - ₹280" → amount: 280
+   - "Blood Urea - ₹100" → amount: 100
+   - If you're tempted to use ₹4,460 for a lab test, STOP - that's the category total, not the individual test amount
 
-4. QUANTITY AND RATE:
+5. QUANTITY AND RATE:
    - Always extract quantity if visible (even if it's 1)
    - Always extract per-unit rate if visible
    - Calculate: amount should equal rate × quantity (within rounding tolerance)
 
-5. RETURNS/CREDITS:
+6. RETURNS/CREDITS:
    - If you see negative amounts or "RETURN DETAILS", mark quantity as negative
    - Example: "Syringe - 5ml (Bd) - RETURN - Qty: -2 - Amount: -₹18.84"
 
@@ -279,7 +286,7 @@ def parse_pdf_with_vision(
     
     # It's a PDF - convert ALL pages to images
     print(f"Converting PDF to images (all pages)...")
-    images = convert_from_path(str(pdf_path), dpi=300)
+    images = convert_from_path(str(pdf_path), dpi=150)
     
     if not images:
         raise ValueError(f"Could not extract any pages from PDF")
