@@ -2476,11 +2476,22 @@ async function loadDashboard() {
     }).join('');
 }
 
-function viewAnalysis(analysisId) {
+async function viewAnalysis(analysisId) {
     currentAnalysisId = analysisId;
-    showPage('results');
-    // Your existing code will need to load this analysis
-    // We'll wire this up in the next chunk
+    window.currentAnalysisId = analysisId;
+    
+    try {
+        const results = await getResults(analysisId);
+        if (results) {
+            displayResults(results);
+            showPage('results');
+        } else {
+            alert('Could not load this analysis.');
+        }
+    } catch (error) {
+        console.error('Error loading analysis:', error);
+        alert('Failed to load analysis.');
+    }
 }
 
 async function deleteAnalysis(analysisId) {
