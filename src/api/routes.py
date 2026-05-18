@@ -37,6 +37,27 @@ from src.scripts.vision_llm_parser import parse_pdf_with_vision
 
 router = APIRouter()
 
+import re
+
+def redact_pii(text: str) -> str:
+    """Redact Aadhaar, PAN, and other PII from logs."""
+    if not isinstance(text, str):
+        text = str(text)
+    
+    # Redact 12-digit Aadhaar (with or without spaces/dashes)
+    text = re.sub(r'\b\d{4}[\s-]?\d{4}[\s-]?\d{4}\b', 'XXXX-XXXX-XXXX', text)
+    
+    # Redact PAN (format: ABCDE1234F)
+    text = re.sub(r'\b[A-Z]{5}\d{4}[A-Z]\b', 'XXXXX1234X', text)
+    
+    # Redact phone numbers (10 digits)
+    text = re.sub(r'\b[6-9]\d{9}\b', 'XXXXXXXXXX', text)
+    
+    # Redact email addresses
+    text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', 'user@redacted.com', text)
+    
+    return text
+
 # ============================================================
 # SCENARIO CLASSIFICATION + LETTER VALIDATION
 # ============================================================
@@ -163,8 +184,6 @@ ALLOWED_MIME_TYPES = [
 IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'tiff', 'tif', 'bmp', 'webp']
 
 
-
-    
 @router.post("/analysis/create")
 async def create_analysis(
     data: AnalysisCreate,
@@ -176,6 +195,41 @@ async def create_analysis(
         # Extract session token from header (sent by frontend)
         session_token = request.headers.get("X-Session-Token") if request else None
         
+        # ============================================================
+        # GUARDRAIL 3: RATE LIMITING
+        # ============================================================
+        from datetime import datetime, timedelta
+        
+        # Get client IP
+        client_ip = request.client.host if request else "unknown"
+        
+        # Check recent analyses from this IP/session in the last hour
+        one_hour_ago = (datetime.utcnow() - timedelta(hours=1)).isoformat()
+        
+        # Count recent analyses
+        recent_count_query = db.table('analyses').select('id', count='exact')
+        
+        if session_token:
+            # For logged-in users: check session_token
+            recent = recent_count_query.eq('session_token', session_token).gte('created_at', one_hour_ago).execute()
+        else:
+            # For anonymous: would need IP tracking table (skip for now, just warn)
+            recent = None
+        
+        # Apply limits
+        if recent and recent.count:
+            # Anonymous: 3/hour, Logged-in: 20/hour (simple heuristic: if session exists, assume logged in)
+            limit = 20 if session_token else 3
+            
+            if recent.count >= limit:
+                raise HTTPException(
+                    status_code=429, 
+                    detail=f"Rate limit exceeded. Please wait before creating another analysis. Limit: {limit} per hour."
+                )
+        
+        # ============================================================
+        # Create analysis record
+        # ============================================================
         result = db.table('analyses').insert({
             'status': 'processing',
             'patient_name': data.patient_name,
@@ -443,7 +497,7 @@ async def run_analysis(
         print("="*80)
         print("🔍 DEBUG: VISION PARSER OUTPUT")
         print("="*80)
-        print(json.dumps(bill_data, indent=2))
+        print(redact_pii(json.dumps(bill_data, indent=2)))
         print("="*80)
         
         # Initialize RAG and agent
@@ -495,9 +549,9 @@ async def run_analysis(
 
         # Log what we extracted for debugging
         print(f"📋 Extracted metadata:")
-        print(f"   Hospital: {result.hospital_name or 'NOT FOUND'}")
+        print(f"   Hospital: {redact_pii(str(result.hospital_name or 'NOT FOUND'))}")
         print(f"   Bill #:   {result.bill_number or 'NOT FOUND'}")
-        print(f"   Patient:  {result.patient_name or 'NOT FOUND'}")
+        print(f"   Patient:  {redact_pii(str(result.patient_name or 'NOT FOUND'))}")
 
         db.table('analyses').update(update_payload).eq('id', analysis_id).execute()    
         

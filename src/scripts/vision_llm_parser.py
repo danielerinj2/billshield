@@ -15,6 +15,7 @@ Activated when:
 import base64
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,110 @@ TEXT_MODEL = "llama-3.3-70b-versatile"
 
 # Max image dimension (Groq has limits)
 MAX_IMAGE_SIZE = 2048
+
+
+# ============================================================
+# GUARDRAIL 4: PROMPT INJECTION DEFENSE
+# ============================================================
+def sanitize_prompt(text: str) -> str:
+    """Remove prompt injection attempts from text before sending to LLM.
+    
+    Strips patterns like:
+    - "Ignore all previous instructions"
+    - "You are now in DAN mode"
+    - "Disregard system prompt"
+    - Jailbreak attempts
+    """
+    if not isinstance(text, str):
+        return text
+    
+    # Patterns that indicate prompt injection
+    injection_patterns = [
+        r'ignore\s+(all\s+)?(previous|prior|above)\s+instructions?',
+        r'disregard\s+(the\s+)?(system\s+)?prompt',
+        r'you\s+are\s+now\s+(in\s+)?dan\s+mode',
+        r'pretend\s+(you\s+are|to\s+be)',
+        r'act\s+as\s+if',
+        r'bypass\s+(your\s+)?guidelines',
+        r'override\s+(your\s+)?instructions',
+        r'jailbreak',
+        r'developer\s+mode',
+        r'god\s+mode',
+        r'simulate\s+(being|a)\s+different',
+        r'forget\s+(everything|all\s+previous)',
+        r'new\s+instructions?:',
+    ]
+    
+    # Remove injection attempts (case-insensitive)
+    cleaned = text
+    for pattern in injection_patterns:
+        cleaned = re.sub(pattern, '[FILTERED]', cleaned, flags=re.IGNORECASE)
+    
+    # If we filtered anything, log it (but don't break execution)
+    if cleaned != text:
+        print("⚠️ SECURITY: Prompt injection attempt detected and filtered")
+    
+    return cleaned
+
+
+# ============================================================
+# GUARDRAIL 5: OUTPUT VALIDATION
+# ============================================================
+def validate_output(result: dict[str, Any]) -> tuple[bool, str]:
+    """Validate LLM output for hallucinations and data quality.
+    
+    Returns (is_valid, warning_message).
+    """
+    warnings = []
+    
+    # Check 1: Verify line items exist
+    line_items = result.get('line_items', [])
+    if not line_items:
+        return False, "No line items extracted"
+    
+    # Check 2: Verify amounts are reasonable
+    for idx, item in enumerate(line_items):
+        amount = item.get('amount', 0)
+        
+        # Flag suspiciously high amounts (>₹1 lakh per item)
+        if amount > 100000:
+            warnings.append(f"Item {idx+1} has unusually high amount: ₹{amount:,.2f}")
+        
+        # Flag negative amounts (except for returns)
+        if amount < 0 and 'return' not in item.get('description', '').lower():
+            warnings.append(f"Item {idx+1} has negative amount without 'return' keyword")
+    
+    # Check 3: Verify total matches sum of line items (within 5% tolerance)
+    total_claimed = result.get('total_amount', 0)
+    total_calculated = sum(item.get('amount', 0) for item in line_items)
+    
+    if total_claimed > 0 and total_calculated > 0:
+        diff_percent = abs(total_claimed - total_calculated) / total_claimed * 100
+        if diff_percent > 5:
+            warnings.append(
+                f"Total mismatch: Bill shows ₹{total_claimed:,.2f}, "
+                f"line items sum to ₹{total_calculated:,.2f} ({diff_percent:.1f}% difference)"
+            )
+    
+    # Check 4: Verify required fields are present
+    required_fields = ['hospital_name', 'bill_number', 'patient_name']
+    missing_fields = [f for f in required_fields if not result.get(f)]
+    
+    if missing_fields:
+        warnings.append(f"Missing critical fields: {', '.join(missing_fields)}")
+    
+    # Check 5: Flag if ALL line items have same amount (likely extraction error)
+    amounts = [item.get('amount', 0) for item in line_items]
+    if len(set(amounts)) == 1 and len(amounts) > 3:
+        warnings.append("All line items have identical amounts - possible extraction error")
+    
+    # Return validation result
+    if warnings:
+        warning_msg = " | ".join(warnings)
+        print(f"⚠️ OUTPUT VALIDATION WARNINGS: {warning_msg}")
+        return True, warning_msg  # Allow with warnings
+    
+    return True, "OK"
 
 
 def resize_image_if_needed(image: Image.Image, max_size: int = MAX_IMAGE_SIZE) -> Image.Image:
@@ -212,6 +317,11 @@ def parse_with_vision_llm(
     # Build prompt
     prompt = build_vision_prompt(doc_type)
     
+    # ============================================================
+    # GUARDRAIL 4: Sanitize prompt before sending to LLM
+    # ============================================================
+    prompt = sanitize_prompt(prompt)
+    
     # Call Groq vision API
     response = client.chat.completions.create(
         model=VISION_MODEL,
@@ -254,6 +364,17 @@ def parse_with_vision_llm(
         result = json.loads(response_text)
     except json.JSONDecodeError as e:
         raise ValueError(f"LLM returned invalid JSON: {e}\n\nResponse:\n{response_text}")
+    
+    # ============================================================
+    # GUARDRAIL 5: Validate output before returning
+    # ============================================================
+    is_valid, validation_msg = validate_output(result)
+    if not is_valid:
+        raise ValueError(f"Output validation failed: {validation_msg}")
+    
+    # Add validation warnings to result metadata
+    if validation_msg != "OK":
+        result['_validation_warnings'] = validation_msg
     
     return result
 
