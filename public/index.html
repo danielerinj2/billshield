@@ -2058,10 +2058,19 @@
                     alert(`You can upload up to ${MAX_FILES} files. Remove one before adding more.`);
                     break;
                 }
+                // File type validation
+                const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+                if (!allowedTypes.includes(file.type)) {
+                    alert(`"${file.name}" is not a supported file type. Only PDF, JPG, and PNG files are allowed.`);
+                    continue;
+                }
+                
+                // File size validation
                 if (file.size > 10 * 1024 * 1024) {
                     alert(`"${file.name}" is larger than 10MB. Please compress it or upload a smaller file.`);
                     continue;
                 }
+                
                 uploadedFiles.push({ file, docType: classifyByFilename(file.name) });
             }
             input.value = '';
@@ -2544,7 +2553,7 @@ async function maybeShowAuthGate(analysisId, analysisData) {
     
     return true;
 }
-const API_URL = 'https://billshield.up.railway.app';
+const API_URL = 'https://billshield.onrender.com';
 // Quirky rotating messages while analyzing
 const QUIRKY_MESSAGES = [
     "Reading between the lines (literally—hospitals love vague bundling)...",
