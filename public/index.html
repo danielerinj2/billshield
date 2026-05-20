@@ -2641,18 +2641,20 @@ async function uploadDocument(analysisId, file, docType) {
 
 async function runAnalysis(analysisId) {
     try {
+        // Trigger the background analysis (returns immediately with status: 'processing')
         const response = await fetch(`${API_URL}/api/analysis/run/${analysisId}`, {
             method: 'POST'
         });
         if (!response.ok) {
-            console.error('Analysis failed with status:', response.status);
+            console.error('Failed to start analysis:', response.status);
             return false;
         }
         const data = await response.json();
-        console.log('Analysis response:', data);
-        return data.status === 'complete' || data.status === 'processing';
+        console.log('Analysis started:', data);
+        // Backend now processes in background - frontend will poll via waitForResults
+        return true;
     } catch (error) {
-        console.error('Error running analysis:', error);
+        console.error('Error starting analysis:', error);
         return false;
     }
 }
@@ -2670,28 +2672,31 @@ async function getResults(analysisId) {
 
 async function waitForResults(analysisId, onProgress) {
     let attempts = 0;
-    const maxAttempts = 60;
+    const maxAttempts = 90; // 90 attempts * 3 seconds = 4.5 minutes max wait
     
     while (attempts < maxAttempts) {
         const results = await getResults(analysisId);
         
         if (results && results.analysis && results.analysis.status === 'complete') {
+            if (onProgress) onProgress(100);
             return results;
         }
-        if (results && results.analysis.status === 'failed') {
-            throw new Error('Analysis failed');
+        if (results && results.analysis && results.analysis.status === 'failed') {
+            throw new Error('Analysis failed on the server. Please try again or contact support.');
         }
         
+        // Show realistic progress (slower at first, faster near end)
         if (onProgress) {
-            const progress = Math.min((attempts / maxAttempts) * 100, 95);
+            const progress = Math.min(10 + (attempts / maxAttempts) * 85, 95);
             onProgress(progress);
-            document.getElementById('progressBar').style.width = progress + '%';
         }
         
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Poll every 3 seconds (gives backend time to process)
+        await new Promise(resolve => setTimeout(resolve, 3000));
         attempts++;
     }
-    throw new Error('Analysis timeout');
+    
+    throw new Error('Analysis is taking longer than expected. Please refresh the page in a few moments to check results.');
 }
 
 window.handleUpload = async function(event) {

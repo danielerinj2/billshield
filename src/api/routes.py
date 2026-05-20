@@ -7,7 +7,7 @@ from src.scripts.multi_bill_detector import detect_multi_bill
 from pathlib import Path
 from typing import List
 
-from fastapi import APIRouter, HTTPException, Depends, File, UploadFile, Form, Request
+from fastapi import APIRouter, HTTPException, Depends, File, UploadFile, Form, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 from supabase import Client
 
@@ -38,6 +38,7 @@ from src.scripts.vision_llm_parser import parse_pdf_with_vision
 router = APIRouter()
 
 import re
+from datetime import datetime, timedelta
 
 def redact_pii(text: str) -> str:
     """Redact Aadhaar, PAN, and other PII from logs."""
@@ -57,6 +58,32 @@ def redact_pii(text: str) -> str:
     text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', 'user@redacted.com', text)
     
     return text
+
+def filter_prompt_injection(text: str) -> str:
+    """Remove prompt injection attempts from bill text."""
+    if not isinstance(text, str):
+        return text
+    
+    # Patterns that indicate prompt injection
+    injection_patterns = [
+        r'ignore\s+(all\s+)?(previous\s+)?(instructions|prompts|rules)',
+        r'disregard\s+(all\s+)?(previous\s+)?(instructions|prompts|rules)',
+        r'override\s+system',
+        r'system\s*:\s*',
+        r'assistant\s*:\s*',
+        r'you\s+are\s+now',
+        r'forget\s+(everything|all)',
+        r'new\s+instructions',
+        r'admin\s+mode',
+        r'developer\s+mode',
+        r'sudo\s+mode',
+    ]
+    
+    cleaned = text
+    for pattern in injection_patterns:
+        cleaned = re.sub(pattern, '[FILTERED]', cleaned, flags=re.IGNORECASE)
+    
+    return cleaned
 
 # ============================================================
 # SCENARIO CLASSIFICATION + LETTER VALIDATION
@@ -167,6 +194,26 @@ def validate_letter_content(content: str, scenario: str, analysis_data: dict) ->
         if 'Refund of ₹0' in content or 'Refund of Rs. 0' in content or 'refund of rs. 0' in content.lower():
             return False, "Contains 'Refund of Rs. 0' (no overcharges but asking for refund)"
     
+    # Check 5: Validate cited regulations exist (basic check)
+    # Look for CGHS, NPPA, IRDAI references
+    cghs_pattern = r'CGHS\s+(?:rate|code|entry)\s*[:\-]?\s*(\d+[\d\.\-]*)'
+    nppa_pattern = r'NPPA\s+(?:ceiling|price|rate)\s*[:\-]?\s*₹?\s*(\d+)'
+    irdai_pattern = r'IRDAI\s+(?:guideline|regulation|circular)\s*[:\-]?\s*([A-Z0-9\-/]+)'
+    
+    cghs_matches = re.findall(cghs_pattern, content, re.IGNORECASE)
+    nppa_matches = re.findall(nppa_pattern, content, re.IGNORECASE)
+    irdai_matches = re.findall(irdai_pattern, content, re.IGNORECASE)
+    
+    # Log found references for manual verification
+    if cghs_matches or nppa_matches or irdai_matches:
+        print(f"🔍 Regulation references found in letter:")
+        if cghs_matches:
+            print(f"   CGHS codes: {cghs_matches}")
+        if nppa_matches:
+            print(f"   NPPA prices: {nppa_matches}")
+        if irdai_matches:
+            print(f"   IRDAI refs: {irdai_matches}")
+    
     return True, "OK"
 
 
@@ -198,8 +245,6 @@ async def create_analysis(
         # ============================================================
         # GUARDRAIL 3: RATE LIMITING
         # ============================================================
-        from datetime import datetime, timedelta
-        
         # Get client IP
         client_ip = request.client.host if request else "unknown"
         
@@ -237,7 +282,7 @@ async def create_analysis(
             'bill_number': data.bill_number,
             'policy_number': data.policy_number,
             'claim_number': data.claim_number,
-            'session_token': session_token  # NEW: track anonymous sessions
+            'session_token': session_token
         }).execute()
         
         analysis_id = result.data[0]['id']
@@ -421,15 +466,40 @@ def parse_document(temp_file_path: str, doc_type: str, is_image: bool):
 @router.post("/analysis/run/{analysis_id}")
 async def run_analysis(
     analysis_id: str,
-    db: Client = Depends(get_db)
+    background_tasks: BackgroundTasks
 ):
-    """Run BillShield agent on uploaded documents."""
+    """Start analysis in the background and return immediately.
+    
+    The heavy work (parsing, vision LLM, RAG, agent) runs in _process_analysis
+    after this response is sent. The frontend polls GET /analysis/{id} and waits
+    for status to flip from 'processing' to 'complete' (or 'failed').
+    """
+    # Schedule the worker to run after we return
+    background_tasks.add_task(_process_analysis, analysis_id)
+    
+    # Return instantly — connection closes, no timeout possible
+    return {
+        "analysis_id": analysis_id,
+        "status": "processing"
+    }
+
+
+def _process_analysis(analysis_id: str):
+    """Background worker: does the actual analysis. Not a route.
+    
+    Creates its own DB connection via the singleton (safe, since get_db
+    returns a shared long-lived client). Updates the analyses row to
+    'complete' or 'failed' so the polling frontend knows when it's done.
+    """
+    db = get_db()  # same singleton client the routes use
     try:
         # Get documents for this analysis
         docs = db.table('documents').select('*').eq('analysis_id', analysis_id).execute()
         
         if not docs.data:
-            raise HTTPException(status_code=404, detail="No documents found")
+            print(f"❌ No documents found for analysis {analysis_id}")
+            db.table('analyses').update({'status': 'failed'}).eq('id', analysis_id).execute()
+            return
         
         # Initialize data containers
         bill_data = None
@@ -464,6 +534,12 @@ async def run_analysis(
                 print(f"🔍 Parsing {doc['doc_type']} ({file_extension})...")
                 parsed_data = parse_document(temp_file_path, doc['doc_type'], is_image)
                 
+                # GUARDRAIL: Apply prompt injection filter to descriptions
+                if parsed_data and 'line_items' in parsed_data:
+                    for item in parsed_data['line_items']:
+                        if 'description' in item:
+                            item['description'] = filter_prompt_injection(item['description'])
+                
                 # Store parsed data
                 if doc['doc_type'] == 'bill':
                     bill_data = parsed_data
@@ -484,10 +560,9 @@ async def run_analysis(
         
         # Verify we got at least the bill
         if not bill_data:
-            raise HTTPException(
-                status_code=400, 
-                detail="Could not parse hospital bill. Please check the file format."
-            )
+            print(f"❌ Could not parse hospital bill for analysis {analysis_id}")
+            db.table('analyses').update({'status': 'failed'}).eq('id', analysis_id).execute()
+            return
         
         print(f"📋 Documents parsed:")
         print(f"   Bill: {'✓' if bill_data else '✗'}")
@@ -497,6 +572,7 @@ async def run_analysis(
         print("="*80)
         print("🔍 DEBUG: VISION PARSER OUTPUT")
         print("="*80)
+        # GUARDRAIL: Redact PII from debug logs
         print(redact_pii(json.dumps(bill_data, indent=2)))
         print("="*80)
         
@@ -519,9 +595,7 @@ async def run_analysis(
         print(f"🔍 Result.issues length: {len(result.issues) if hasattr(result, 'issues') else 0}")
         if hasattr(result, 'issues') and len(result.issues) > 0:
             print(f"🔍 First issue: {result.issues[0]}")
-
-
-
+        
         # Update analysis record (only update metadata fields if they were extracted, preserve existing values otherwise)
         update_payload = {
             'status': 'complete',
@@ -534,7 +608,7 @@ async def run_analysis(
             'max_recoverable': result.estimated_recoverable['max'],
             'raw_result': result.to_dict()
         }
-
+        
         # Only update metadata if we successfully extracted it (don't overwrite user-entered values with null)
         if result.hospital_name:
             update_payload['hospital_name'] = result.hospital_name
@@ -546,14 +620,14 @@ async def run_analysis(
             update_payload['policy_number'] = result.policy_number
         if result.claim_number:
             update_payload['claim_number'] = result.claim_number
-
-        # Log what we extracted for debugging
+        
+        # GUARDRAIL: Log extracted metadata with PII redacted
         print(f"📋 Extracted metadata:")
         print(f"   Hospital: {redact_pii(str(result.hospital_name or 'NOT FOUND'))}")
         print(f"   Bill #:   {result.bill_number or 'NOT FOUND'}")
         print(f"   Patient:  {redact_pii(str(result.patient_name or 'NOT FOUND'))}")
-
-        db.table('analyses').update(update_payload).eq('id', analysis_id).execute()    
+        
+        db.table('analyses').update(update_payload).eq('id', analysis_id).execute()
         
         # Insert issues with comprehensive debugging
         print(f"💾 BEFORE INSERT: Agent returned {len(result.issues)} issues")
@@ -586,28 +660,18 @@ async def run_analysis(
                 import traceback
                 print(f"❌ Traceback: {traceback.format_exc()}")
         
-        return {
-            "analysis_id": analysis_id,
-            "status": "complete",
-            "issues_count": len(result.issues),
-            "verified_overcharge": result.total_verified_overcharge
-        }
-    except HTTPException:
-        raise
+        print(f"✅ Analysis {analysis_id} complete: {len(result.issues)} issues")
+        
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"ERROR in run_analysis: {error_details}")
+        print(f"ERROR in _process_analysis: {error_details}")
         
-        # Update analysis to failed status
+        # Update analysis to failed status so frontend stops polling
         try:
-            db.table('analyses').update({
-                'status': 'failed'
-            }).eq('id', analysis_id).execute()
+            db.table('analyses').update({'status': 'failed'}).eq('id', analysis_id).execute()
         except:
             pass
-        
-        raise HTTPException(status_code=500, detail=f"Failed to run analysis: {str(e)}")
 
 
 @router.get("/analysis/{analysis_id}")
@@ -702,7 +766,7 @@ async def generate_letters(
                     skipped_letters.append({'type': letter_type, 'reason': 'no_content'})
                     continue
                 
-                # Validate before saving
+                # GUARDRAIL: Validate before saving
                 is_valid, reason = validate_letter_content(content, scenario, raw_result)
                 if not is_valid:
                     print(f"❌ {letter_type} failed validation: {reason}")
