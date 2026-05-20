@@ -37,6 +37,20 @@ from src.scripts.vision_llm_parser import parse_pdf_with_vision
 
 router = APIRouter()
 
+# Load the RAG system ONCE at import time and reuse it for every analysis.
+# Building BillShieldRAG() per-request reloads a ~90MB model each time and
+# crashes the 512MB free tier. One shared instance fixes that.
+_rag_instance = None
+
+def get_rag():
+    """Return a single shared BillShieldRAG, creating it on first use."""
+    global _rag_instance
+    if _rag_instance is None:
+        print("🔧 Loading RAG system (one-time)...")
+        _rag_instance = BillShieldRAG()
+        print("✅ RAG system loaded and cached")
+    return _rag_instance
+
 import re
 from datetime import datetime, timedelta
 
@@ -576,8 +590,8 @@ def _process_analysis(analysis_id: str):
         print(redact_pii(json.dumps(bill_data, indent=2)))
         print("="*80)
         
-        # Initialize RAG and agent
-        rag = BillShieldRAG()
+        # Initialize RAG (shared singleton) and agent
+        rag = get_rag()
         agent = BillShieldAgent(rag_system=rag)
         
         # Run analysis
