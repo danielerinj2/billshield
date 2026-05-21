@@ -2770,6 +2770,10 @@ window.handleUpload = async function(event) {
         const results = await waitForResults(analysisId, (progress) => { updateProgress(progress); });
 
        // Check if user needs to sign up before viewing results
+        // Store analysis ID FIRST (before gate, so OAuth can save it)
+        window.currentAnalysisId = analysisId;
+        
+        // Check if user needs to sign up before viewing results
         const gateShown = await maybeShowAuthGate(analysisId, results);
         if (gateShown) {
             // User needs to sign up - stop here, modal will reload page on success
@@ -2782,7 +2786,6 @@ window.handleUpload = async function(event) {
         
         // Show results
         displayResults(results);
-        window.currentAnalysisId = analysisId;
         stopQuirkyMessages();
         document.getElementById('analyzing').classList.remove('active');
         document.getElementById('results').classList.add('active');
