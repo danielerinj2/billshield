@@ -2373,7 +2373,12 @@ async function handleGoogleAuth() {
     // Save current analysis ID before OAuth redirect (survives page reload)
     if (window.currentAnalysisId) {
         localStorage.setItem('billshield_pending_analysis', window.currentAnalysisId);
+        // Force localStorage to flush before redirect
+        localStorage.getItem('billshield_pending_analysis'); // Read to confirm write
     }
+    
+    // Small delay to ensure localStorage write completes
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     const { error } = await supabaseClient.auth.signInWithOAuth({
         provider: 'google',
