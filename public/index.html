@@ -2370,6 +2370,11 @@ async function handleAuthSubmit(event) {
 }
 
 async function handleGoogleAuth() {
+    // Save current analysis ID before OAuth redirect (survives page reload)
+    if (window.currentAnalysisId) {
+        localStorage.setItem('billshield_pending_analysis', window.currentAnalysisId);
+    }
+    
     const { error } = await supabaseClient.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -2523,18 +2528,42 @@ window.addEventListener('DOMContentLoaded', async () => {
     await checkAuthState();
     
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN') {
-            currentUser = session?.user || null;
-            await claimAnonymousAnalyses();
-            updateNavForAuthState();
-        } else if (event === 'SIGNED_OUT') {
-            currentUser = null;
-            updateNavForAuthState();
+    if (event === 'SIGNED_IN') {
+        currentUser = session?.user || null;
+        await claimAnonymousAnalyses();
+        updateNavForAuthState();
+        
+        // Check if user just returned from OAuth with a pending analysis
+        const pendingAnalysisId = localStorage.getItem('billshield_pending_analysis');
+        if (pendingAnalysisId) {
+            localStorage.removeItem('billshield_pending_analysis');
+            
+            // Load and display that analysis
+            try {
+                const results = await getResults(pendingAnalysisId);
+                if (results) {
+                    window.currentAnalysisId = pendingAnalysisId;
+                    displayResults(results);
+                    showPage('results');
+                } else {
+                    // Analysis not found, go to dashboard
+                    showPage('dashboard');
+                    loadDashboard();
+                }
+            } catch (error) {
+                console.error('Failed to load pending analysis:', error);
+                showPage('dashboard');
+                loadDashboard();
+            }
         }
-    });
+    } else if (event === 'SIGNED_OUT') {
+        currentUser = null;
+        updateNavForAuthState();
+    }
 });
 
 // ======================================================================
+});
 // GATE MODAL — call this when analysis completes
 // ======================================================================
 async function maybeShowAuthGate(analysisId, analysisData) {
