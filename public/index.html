@@ -2532,43 +2532,57 @@ async function getAuthHeader() {
 window.addEventListener('DOMContentLoaded', async () => {
     await checkAuthState();
     
-    supabaseClient.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN') {
-        currentUser = session?.user || null;
-        await claimAnonymousAnalyses();
-        updateNavForAuthState();
-        
-        // Check if user just returned from OAuth with a pending analysis
+    // OAuth return handler: if logged in with a pending analysis, claim & show it.
+    // This runs on EVERY page load, which reliably catches the Google OAuth redirect
+    // (the onAuthStateChange event alone is unreliable on OAuth return).
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (user) {
         const pendingAnalysisId = localStorage.getItem('billshield_pending_analysis');
         if (pendingAnalysisId) {
             localStorage.removeItem('billshield_pending_analysis');
-            
-            // Load and display that analysis
+            await claimAnonymousAnalyses();  // link the analysis to this account
             try {
                 const results = await getResults(pendingAnalysisId);
-                if (results) {
+                if (results && results.analysis && results.analysis.status === 'complete') {
                     window.currentAnalysisId = pendingAnalysisId;
                     displayResults(results);
                     showPage('results');
-                } else {
-                    // Analysis not found, go to dashboard
-                    showPage('dashboard');
-                    loadDashboard();
                 }
-            } catch (error) {
-                console.error('Failed to load pending analysis:', error);
-                showPage('dashboard');
-                loadDashboard();
+            } catch (e) {
+                console.error('Failed to load pending analysis on page load:', e);
             }
         }
-    } else if (event === 'SIGNED_OUT') {
-        currentUser = null;
-        updateNavForAuthState();
     }
+    
+    supabaseClient.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN') {
+            currentUser = session?.user || null;
+            await claimAnonymousAnalyses();
+            updateNavForAuthState();
+            
+            // Backup: also check for pending analysis here (covers email/password flow)
+            const pendingAnalysisId = localStorage.getItem('billshield_pending_analysis');
+            if (pendingAnalysisId) {
+                localStorage.removeItem('billshield_pending_analysis');
+                try {
+                    const results = await getResults(pendingAnalysisId);
+                    if (results && results.analysis && results.analysis.status === 'complete') {
+                        window.currentAnalysisId = pendingAnalysisId;
+                        displayResults(results);
+                        showPage('results');
+                    }
+                } catch (error) {
+                    console.error('Failed to load pending analysis:', error);
+                }
+            }
+        } else if (event === 'SIGNED_OUT') {
+            currentUser = null;
+            updateNavForAuthState();
+        }
+    });
 });
 
 // ======================================================================
-});
 // GATE MODAL — call this when analysis completes
 // ======================================================================
 async function maybeShowAuthGate(analysisId, analysisData) {
