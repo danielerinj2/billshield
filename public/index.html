@@ -2785,12 +2785,19 @@ function showAnalysisError(reason) {
         body.textContent = "This one's on us, not you — the analysis didn't finish. Please try again in a moment.";
         hint.style.display = 'none';
         support.style.display = 'block';
-    } else {
-        // default: unreadable_document
-        title.textContent = "We couldn't read a hospital bill in that upload";
-        body.textContent = "The file we received didn't look like an itemized hospital bill. This usually means a different document was uploaded by mistake — like a screenshot, a blank page, or an unrelated PDF.";
+    } else if (reason === 'upload_failed') {
+        title.textContent = "We couldn't open that file";
+        body.textContent = "The file didn't upload properly. This can happen if it's password-protected, corrupted, or larger than 10 MB.";
+        hint.innerHTML = "Try a clear PDF or photo (JPG/PNG) of the <strong>itemized hospital or pharmacy bill</strong>.";
         hint.style.display = 'block';
         support.style.display = 'none';
+    } else {
+        // default: unreadable_document — works for PDF, JPG, PNG alike
+        title.textContent = "Is this a hospital or pharmacy bill?";
+        body.textContent = "We looked at your file but couldn't find the line items we'd expect on a medical bill. If you uploaded something else by mistake — like a discharge summary, an ID, or a screenshot of another page — try again with the bill itself.";
+        hint.innerHTML = "We can read PDFs and photos (JPG/PNG). Just make sure it's the <strong>itemized bill</strong> — the page that lists charges and amounts.";
+        hint.style.display = 'block';
+        support.style.display = 'block';
     }
 
     document.getElementById('analysisError').classList.add('active');
@@ -2832,15 +2839,19 @@ window.handleUpload = async function(event) {
 
         updateStatus('Creating analysis...');
         const analysisId = await createAnalysis(patientName);
-        if (!analysisId) return;
+        if (!analysisId) { showAnalysisError('server_error'); return; }
 
         for (let i = 0; i < uploadedFiles.length; i++) {
             const entry = uploadedFiles[i];
             const wireType = entry.docType === 'unknown' ? 'bill' : entry.docType;
             updateStatus(`Uploading ${entry.file.name} (${i + 1} of ${uploadedFiles.length})...`);
             const ok = await uploadDocument(analysisId, entry.file, wireType);
-            if (!ok && i === 0) { alert('Failed to upload the first document. Please try again.'); return; }
+            if (!ok && i === 0) { showAnalysisError('upload_failed'); return; }
         }
+
+        updateStatus('Starting AI analysis...');
+        const started = await runAnalysis(analysisId);
+        if (!started) { showAnalysisError('server_error'); return; }
 
         updateStatus('Starting AI analysis...');
         const started = await runAnalysis(analysisId);
