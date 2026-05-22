@@ -683,7 +683,10 @@ def _process_analysis(analysis_id: str):
         
         # Update analysis to failed status so frontend stops polling
         try:
-            db.table('analyses').update({'status': 'failed'}).eq('id', analysis_id).execute()
+            db.table('analyses').update({
+                'status': 'failed',
+                'failure_reason': 'server_error'
+            }).eq('id', analysis_id).execute()
         except:
             pass
 
