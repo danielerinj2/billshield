@@ -2851,10 +2851,6 @@ window.handleUpload = async function(event) {
 
         updateStatus('Starting AI analysis...');
         const started = await runAnalysis(analysisId);
-        if (!started) { showAnalysisError('server_error'); return; }
-
-        updateStatus('Starting AI analysis...');
-        const started = await runAnalysis(analysisId);
         if (!started) { alert('Failed to start analysis'); return; }
 
         updateStatus('Analyzing against 8,047 benchmarks...');
